@@ -8,7 +8,17 @@
 //
 // Env: ELYSIUM_RPC, FUNDER_PRIVATE_KEY (pays gas, mints test USDC), CREATOR_PRIVATE_KEY.
 import { writeFileSync } from "node:fs";
-import { type Address, type Hash, type Hex, createPublicClient, createWalletClient, http, parseAbi, parseEther } from "viem";
+import {
+  type Address,
+  type Hash,
+  type Hex,
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  http,
+  parseAbi,
+  parseEther,
+} from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   type Deployment,
@@ -123,21 +133,45 @@ async function main() {
     );
   }
 
-  await sent("fire", await creatorClient.fire(round));
+  // Like a bot, the sniper signs its buy in advance (the token address is known before launch) and
+  // broadcasts it the moment the fire lands.
+  let snipe: Hex | undefined;
+  if (sniperAmount > 0n) {
+    const { expectedToken } = await creatorClient.getRound(round);
+    const request = await sniperWallet.prepareTransactionRequest({
+      to: SWAPPER,
+      data: encodeFunctionData({ abi: swapperAbi, functionName: "buy", args: [expectedToken, ascendTestnet.usdc, sniperAmount, sniper.address] }),
+      gas: 1_000_000n,
+    });
+    snipe = await sniperWallet.signTransaction(request);
+  }
+
+  const fireReceipt = await sent("fire", await creatorClient.fire(round));
+  const snipeHash = snipe ? await publicClient.sendRawTransaction({ serializedTransaction: snipe }) : undefined;
   const fired = await creatorClient.getRound(round);
   let sniperReport: Record<string, string> | undefined;
-  if (sniperAmount > 0n && fired.fired) {
-    const fee = await publicClient.readContract({ address: ascendTestnet.launchpad, abi: launchpadAbi, functionName: "currentFee", args: [fired.fired.poolId] });
-    await sent(
-      "sniper buys right after fire",
-      await sniperWallet.writeContract({ address: SWAPPER, abi: swapperAbi, functionName: "buy", args: [fired.fired.token, ascendTestnet.usdc, sniperAmount, sniper.address] }),
-    );
+  if (snipeHash && fired.fired) {
+    const snipeReceipt = await sent("sniper buys right after fire", snipeHash);
+    // The fee Ascend charged in the sniper's own block.
+    const fee = await publicClient.readContract({
+      address: ascendTestnet.launchpad,
+      abi: launchpadAbi,
+      functionName: "currentFee",
+      args: [fired.fired.poolId],
+      blockNumber: snipeReceipt.blockNumber,
+    });
+    const [fireBlock, snipeBlock] = await Promise.all([
+      publicClient.getBlock({ blockNumber: fireReceipt.blockNumber }),
+      publicClient.getBlock({ blockNumber: snipeReceipt.blockNumber }),
+    ]);
     const got = await publicClient.readContract({ address: fired.fired.token, abi: erc20Abi, functionName: "balanceOf", args: [sniper.address] });
     const batchPerUsdc = (fired.fired.netTokens * USDC) / fired.fired.quoteUsed;
     const sniperPerUsdc = (got * USDC) / sniperAmount;
     sniperReport = {
       sniper: sniper.address,
-      launchFeeAtFirePips: String(fee),
+      launchFeePips: String(fee),
+      secondsAfterFire: String(snipeBlock.timestamp - fireBlock.timestamp),
+      blocksAfterFire: String(snipeReceipt.blockNumber - fireReceipt.blockNumber),
       batchTokensPerUsdc: batchPerUsdc.toString(),
       sniperTokensPerUsdc: sniperPerUsdc.toString(),
       batchAdvantage: (Number(batchPerUsdc) / Number(sniperPerUsdc)).toFixed(2),
