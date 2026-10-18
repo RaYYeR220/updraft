@@ -10,6 +10,8 @@ if (!key) throw new Error("missing env KEEPER_PRIVATE_KEY");
 const deploymentPath = process.env.DEPLOYMENT_FILE ?? new URL("../../../deployments/elysium-testnet.json", import.meta.url);
 const deployment = JSON.parse(readFileSync(deploymentPath, "utf8")) as Deployment;
 const INTERVAL_MS = Number(process.env.KEEPER_INTERVAL_MS ?? 15_000);
+const MAX_TX_PER_HOUR = Number(process.env.KEEPER_MAX_TX_PER_HOUR ?? 120);
+const sentAt: number[] = [];
 
 const chain = { ...elysiumTestnet, rpcUrls: { default: { http: [RPC] } } };
 const publicClient = createPublicClient({ chain, transport: http(RPC, { retryCount: 5, retryDelay: 1500 }) });
@@ -28,6 +30,7 @@ async function snapshot(): Promise<RoundView[]> {
     views.push({
       address,
       status: s.status as 0 | 1 | 2,
+      totalCommitted: s.totalCommitted,
       closeAt: s.config.windows.closeAt,
       fireBy: s.config.windows.fireBy,
       participantCount: s.participantCount,
@@ -51,7 +54,8 @@ async function run(a: Action) {
           : a.kind === "distribute"
             ? await updraft.distribute(a.round, a.from, a.to)
             : await updraft.harvest(a.vault);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    sentAt.push(Date.now());
+    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
     if (receipt.status === "success") {
       if (a.kind === "distribute") cursors.set(a.round, Number(a.to));
       if (a.kind === "harvest") harvestedAt.set(a.round, Math.floor(Date.now() / 1000));
@@ -69,7 +73,15 @@ async function tick() {
   try {
     const views = await snapshot();
     const now = Number((await publicClient.getBlock()).timestamp);
-    for (const action of plan(views, now, inFlight)) await run(action);
+    for (const action of plan(views, now, inFlight)) {
+      // A gas budget: rounds are permissionless, so the keeper never spends without limit.
+      while (sentAt.length && sentAt[0] < Date.now() - 3_600_000) sentAt.shift();
+      if (sentAt.length >= MAX_TX_PER_HOUR) {
+        console.warn("hourly transaction budget reached; waiting");
+        break;
+      }
+      await run(action);
+    }
   } catch (e) {
     console.error(`tick failed: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   }

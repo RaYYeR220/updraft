@@ -4,6 +4,7 @@ export interface RoundView {
   address: Address;
   /** 0 live, 1 fired, 2 aborted */
   status: 0 | 1 | 2;
+  totalCommitted: bigint;
   closeAt: number;
   fireBy: number;
   participantCount: number;
@@ -29,10 +30,14 @@ export function plan(
   rounds: RoundView[],
   nowSec: number,
   inFlight: Set<string>,
-  opts: { chunk: number; harvestEverySec: number } = { chunk: 100, harvestEverySec: 1800 },
+  opts: { chunk: number; harvestEverySec: number; maxActions?: number } = { chunk: 100, harvestEverySec: 1800 },
 ): Action[] {
   const actions: Action[] = [];
+  const max = opts.maxActions ?? 10;
   for (const r of rounds) {
+    if (actions.length >= max) break;
+    // Rounds are permissionless; one nobody committed to holds nothing to fire or refund.
+    if (r.totalCommitted === 0n) continue;
     let next: Action | null = null;
     if (r.status === 0) {
       if (nowSec > r.fireBy) next = { kind: "abort", round: r.address };

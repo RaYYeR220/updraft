@@ -6,6 +6,7 @@ const R = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as Address;
 const base: RoundView = {
   address: R(1),
   status: 0,
+  totalCommitted: 500n,
   closeAt: 1000,
   fireBy: 2000,
   participantCount: 0,
@@ -40,6 +41,16 @@ describe("keeper plan", () => {
 
   it("never plans an action that is already in flight", () => {
     expect(plan([{ ...base }], 1000, new Set([`fire:${R(1)}`]))).toEqual([]);
+  });
+
+  it("ignores rounds nobody committed to (no gas spent on empty or spam rounds)", () => {
+    expect(plan([{ ...base, totalCommitted: 0n }], 1000, new Set())).toEqual([]);
+    expect(plan([{ ...base, totalCommitted: 0n }], 2001, new Set())).toEqual([]);
+  });
+
+  it("caps the actions it takes per pass", () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ ...base, address: R(i + 1) }));
+    expect(plan(many, 1000, new Set(), { chunk: 100, harvestEverySec: 1800, maxActions: 10 })).toHaveLength(10);
   });
 
   it("leaves aborted rounds alone", () => {
