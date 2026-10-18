@@ -20,7 +20,7 @@ const BINS: { lo: number; hi: number; label: [string, string] }[] = [
   { lo: 10, hi: Infinity, label: ["10× and", "over"] },
 ];
 
-/** Fig. 2: one bird per dev-buy launch, perched over what the next buyer paid against the dev's average. */
+/** Fig. 2: one bird per dev-buy launch, perched over what the next token cost against the dev's average. */
 export function PremiumChart({ points }: { points: PremiumPoint[] }) {
   const [ref, w] = useWidth<HTMLDivElement>(1040);
   const [active, setActive] = useState<number | null>(null);
@@ -127,7 +127,7 @@ export function PremiumChart({ points }: { points: PremiumPoint[] }) {
         <div className="chart-tip" role="status" aria-live="polite" style={{ opacity: a ? 1 : 0, transform: `translate(${tipLeft}px, ${tipTop}px) translateX(-50%)` }}>
           {a && (
             <>
-              next buyer paid <b>{times(a.p.premium)}</b> the dev&apos;s price
+              next token cost <b>{times(a.p.premium)}</b> the dev&apos;s price
               <br />
               <span className="mono">{short(a.p.token)}</span>, dev-buy {pct(a.p.dev)} of supply
             </>

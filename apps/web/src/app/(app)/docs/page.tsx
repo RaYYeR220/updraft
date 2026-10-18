@@ -170,7 +170,7 @@ export default async function DocsPage() {
                 on-chain certificate: participants, concentration, the creator’s vesting and the policy hash.
               </p>
               <p className="cap">
-                Why: on Ascend testnet, 251 launches up to block 11,040,000, 49 opened with a dev-buy, and after the biggest ones the next buyer paid up to
+                Why: on Ascend testnet, 251 launches up to block 11,040,000, 49 opened with a dev-buy, and after the biggest ones the next token cost up to
                 12.8× the dev’s average price. <Link href="/bottom-of-curve">The full analysis</Link>.
               </p>
             </Sec>

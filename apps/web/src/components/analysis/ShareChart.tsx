@@ -175,7 +175,7 @@ export function ShareChart({ points, windowSeconds }: { points: SharePoint[]; wi
               <span className="mono">{short(a.token)}</span>, {utc(a.at)}
               <br />
               dev-buy {pct(a.dev)}
-              {a.premium !== null ? `, next buyer paid ${times(a.premium)}` : ""}
+              {a.premium !== null ? `, next token cost ${times(a.premium)}` : ""}
             </>
           )}
         </div>

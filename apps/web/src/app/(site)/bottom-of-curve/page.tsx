@@ -15,7 +15,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Bottom of the curve",
   description:
-    "Every launch on Ascend's testnet, read from the chain: how much of each token the creator side bought in its first minute, and what the next buyer paid.",
+    "Every launch on Ascend's testnet, read from the chain: how much of each token the creator side bought in its first minute, and what the next token cost.",
 };
 
 export default async function BottomOfCurve() {
@@ -80,7 +80,7 @@ export default async function BottomOfCurve() {
             </div>
             <p className="lede">
               Every launch on Ascend&apos;s testnet, read from the chain up to block {block}: how much of each token the creator side
-              bought in its first {a.windowSeconds} seconds, and what the next buyer paid for it.
+              bought in its first {a.windowSeconds} seconds, and what the next token cost for it.
             </p>
           </div>
 
@@ -115,7 +115,7 @@ export default async function BottomOfCurve() {
                   {(Math.round(h.maxPremium * 10) / 10).toString()}
                   <small>×</small>
                 </p>
-                <h2>what the next buyer paid against the dev&apos;s average, at the steepest</h2>
+                <h2>what the next token cost against the dev&apos;s average, at the steepest</h2>
                 <p className="cap">after a dev-buy of {pct(h.top.devBuyShareBps)} of supply</p>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default async function BottomOfCurve() {
                 <b>III</b>The next perch
               </p>
               <h2 className="h2" id="h-premium">
-                What the next buyer paid.
+                What the next token cost.
               </h2>
             </div>
             <p className="lede">
@@ -191,10 +191,10 @@ export default async function BottomOfCurve() {
           <div className="plate chart-plate">
             <PremiumChart points={premiumPoints} />
             <p className="cap chart-note">
-              <b>Fig. 2.</b> One bird per launch with a dev-buy, {premiumPoints.length} in all, over what the next buyer paid against the
+              <b>Fig. 2.</b> One bird per launch with a dev-buy, {premiumPoints.length} in all, over what the next token cost against the
               dev&apos;s average price. Median {s.medianNextBuyerPremium !== null ? times(s.medianNextBuyerPremium) : "n/a"}.
               {steep.length > 0 &&
-                ` In ${steep.length} launches the next buyer paid 5× or more; every one of them opened with a dev-buy of at least ${pct(steepMinDev)} of supply.`}
+                ` In ${steep.length} launches the next token cost 5× or more; every one of them opened with a dev-buy of at least ${pct(steepMinDev)} of supply.`}
             </p>
           </div>
           <SniperCallout proof={proof} />

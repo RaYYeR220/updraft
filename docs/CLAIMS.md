@@ -34,7 +34,7 @@ Every claim Updraft makes, and how far it is proven.
 | Claim | Level | Evidence |
 |---|---|---|
 | Of 251 Ascend testnet launches up to block 11,040,000: 49 had a dev-buy, 33 gave the creator side more than 20% of supply in the first minute, the worst case 98.3% | Reproducible | `services/analysis`; [ANALYSIS.md](ANALYSIS.md) |
-| After the biggest dev-buys, the next buyer paid up to 12.8× the dev's average price | Reproducible | Same |
+| After the biggest dev-buys, the next token cost up to 12.8× the dev's average price | Reproducible | Same |
 
 These are testnet numbers. Much of the activity is test traffic, including Ascend's own. They show what the mechanism allows: whoever writes the dev-buy owns the bottom of the curve. They are not a measure of mainnet behaviour.
 

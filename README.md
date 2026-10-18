@@ -19,7 +19,7 @@ We read every launch on Ascend's four testnet launchpads up to block 11,040,000 
 - 49 had a dev-buy.
 - In 33, the creator side took more than 20% of supply in the first minute.
 - The worst case took 98.3%.
-- After the biggest dev-buys, the next buyer paid up to 12.8× the dev's average price.
+- After the biggest dev-buys, the next token cost up to 12.8× the dev's average price.
 
 Method, caveats and data: [docs/ANALYSIS.md](docs/ANALYSIS.md). Live endpoint: `GET /analysis` on the API.
 

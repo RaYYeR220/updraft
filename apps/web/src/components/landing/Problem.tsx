@@ -174,7 +174,7 @@ export function Problem({ f }: { f: ProblemFigures }) {
                   <small>×</small>
                 </div>
                 <div>
-                  <h3>what the next buyer paid after the biggest dev-buys, against the dev&apos;s own average price</h3>
+                  <h3>what the next token cost after the biggest dev-buys, against the dev&apos;s own average price</h3>
                   <p className="cap">Fig. 4. Perch heights drawn to scale.</p>
                 </div>
               </div>
