@@ -118,16 +118,16 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
 
     function initialize(
         RoundConfig calldata cfg,
-        Params calldata params,
-        Wiring calldata wiring,
+        Params calldata params_,
+        Wiring calldata wiring_,
         address expectedToken_,
         bytes32 curveHash_
     ) external {
         if (factory != address(0)) revert AlreadyInitialized();
         factory = msg.sender;
         _cfg = cfg;
-        _params = params;
-        _wiring = wiring;
+        _params = params_;
+        _wiring = wiring_;
         expectedToken = expectedToken_;
         curveHash = curveHash_;
     }

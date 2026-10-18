@@ -21,7 +21,7 @@ depth = 64
 fail_on_revert = false
 
 [rpc_endpoints]
-elysium = "${ELYSIUM_RPC}"
+elysium = "https://testnet-rpc.elysium.kinetiq.xyz"
 
 [fmt]
 line_length = 120
