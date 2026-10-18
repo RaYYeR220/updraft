@@ -1,0 +1,17 @@
+{
+  "name": "@updraft/widget",
+  "version": "0.1.0",
+  "description": "Embed an Updraft round on any site with one script tag.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --minify --format=iife --outfile=dist/updraft-widget.js",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
