@@ -19,7 +19,8 @@ export default createConfig({
   chains: {
     elysium: {
       id: deployment.chainId,
-      rpc: process.env.ELYSIUM_RPC ?? "https://testnet-rpc.elysium.kinetiq.xyz",
+      // Two public endpoints, load-balanced: the public RPC rate-limits each one.
+      rpc: (process.env.ELYSIUM_RPCS ?? "https://testnet-rpc.elysium.kinetiq.xyz,https://rpc-elysium-testnet.t.conduit.xyz").split(","),
       pollingInterval: 2_000,
     },
   },
