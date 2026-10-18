@@ -3,6 +3,8 @@ import postgres from "postgres";
 import { type Address, type Hex, createPublicClient, createWalletClient, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { createApp } from "./app.js";
+import { viemEpochChain } from "./epoch-chain.js";
+import { runEpoch } from "./epoch-job.js";
 import { blockscoutExplorer, viemChainReader } from "./chain.js";
 import { hlInfo } from "./hl.js";
 import { MemoryStore, PgStore, type Store } from "./store.js";
@@ -58,6 +60,24 @@ const app = createApp({
     },
   },
   analysisPath: env("ANALYSIS_PATH", new URL("../../analysis/out/bottom-of-curve.json", import.meta.url).pathname),
+  epochs: process.env.STAKING
+    ? {
+        adminToken: env("ADMIN_TOKEN"),
+        run: () =>
+          runEpoch({
+            store,
+            publicApi: env("PUBLIC_API_URL", "http://localhost:8080"),
+            minWindowSec: Number(env("EPOCH_MIN_WINDOW_SEC", "3600")),
+            chain: viemEpochChain({
+              publicClient,
+              walletClient: apiWallet,
+              staking: env("STAKING") as Address,
+              factory: env("FACTORY") as Address,
+              fromBlock: BigInt(env("DEPLOY_BLOCK", "0")),
+            }),
+          }),
+      }
+    : undefined,
 });
 
 const port = Number(env("PORT", "8080"));

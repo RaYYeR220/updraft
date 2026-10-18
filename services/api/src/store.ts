@@ -9,7 +9,21 @@ export interface VoucherRecord {
   evidenceHash: Hex;
 }
 
+export interface StoredEpoch {
+  id: number;
+  start: number;
+  end: number;
+  root: Hex;
+  tx: Hex | null;
+  /** JSON of the epoch's claims: { account, asset, amount (decimal string), proof }[] */
+  claims: string;
+  tree: string | null;
+}
+
 export interface Store {
+  putEpoch(e: StoredEpoch): Promise<void>;
+  getEpoch(id: number): Promise<StoredEpoch | null>;
+  listEpochs(): Promise<StoredEpoch[]>;
   putEvidence(hash: Hex, json: string): Promise<void>;
   getEvidence(hash: Hex): Promise<string | null>;
   vouchersForRound(round: Address): Promise<VoucherRecord[]>;
@@ -19,10 +33,20 @@ export interface Store {
 }
 
 export class MemoryStore implements Store {
+  private epochs = new Map<number, StoredEpoch>();
   private evidence = new Map<string, string>();
   private vouchers: VoucherRecord[] = [];
   private drips: { key: string; at: number }[] = [];
 
+  async putEpoch(e: StoredEpoch) {
+    this.epochs.set(e.id, e);
+  }
+  async getEpoch(id: number) {
+    return this.epochs.get(id) ?? null;
+  }
+  async listEpochs() {
+    return [...this.epochs.values()].sort((a, b) => a.id - b.id);
+  }
   async putEvidence(hash: Hex, json: string) {
     this.evidence.set(hash, json);
   }
@@ -56,6 +80,32 @@ export class PgStore implements Store {
     await this.sql`create table if not exists updraft.vouchers (round text not null, wallet text not null, identity_id text not null, funder text, evidence_hash text not null, created_at timestamptz not null default now(), primary key (round, wallet))`;
     await this.sql`create table if not exists updraft.drips (key text not null, at bigint not null)`;
     await this.sql`create index if not exists drips_key_at on updraft.drips (key, at)`;
+    await this.sql`create table if not exists updraft.epochs (id int primary key, start_ts bigint not null, end_ts bigint not null, root text not null, tx text, claims text not null, tree text)`;
+  }
+
+  async putEpoch(e: StoredEpoch) {
+    await this.sql`insert into updraft.epochs (id, start_ts, end_ts, root, tx, claims, tree)
+      values (${e.id}, ${e.start}, ${e.end}, ${e.root}, ${e.tx}, ${e.claims}, ${e.tree})
+      on conflict (id) do update set tx = excluded.tx`;
+  }
+  async getEpoch(id: number) {
+    const rows = await this.sql`select * from updraft.epochs where id = ${id}`;
+    return rows.length ? this.toEpoch(rows[0]) : null;
+  }
+  async listEpochs() {
+    const rows = await this.sql`select * from updraft.epochs order by id`;
+    return rows.map((r) => this.toEpoch(r));
+  }
+  private toEpoch(r: Record<string, unknown>): StoredEpoch {
+    return {
+      id: Number(r.id),
+      start: Number(r.start_ts),
+      end: Number(r.end_ts),
+      root: r.root as Hex,
+      tx: (r.tx as Hex | null) ?? null,
+      claims: r.claims as string,
+      tree: (r.tree as string | null) ?? null,
+    };
   }
 
   async putEvidence(hash: Hex, json: string) {

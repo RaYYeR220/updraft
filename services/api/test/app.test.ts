@@ -102,6 +102,21 @@ describe("http api", () => {
     expect(await res.json()).toMatchObject({ ok: false, reason: "not_generated" });
   });
 
+  it("serves stored epoch claims with proofs, and protects the run trigger", async () => {
+    await store.putEpoch({
+      id: 0,
+      start: 1,
+      end: 2,
+      root: `0x${"11".repeat(32)}`,
+      tx: null,
+      claims: JSON.stringify([{ account: A.toLowerCase(), asset: A, amount: "5", proof: [] }]),
+      tree: null,
+    });
+    const res = await app.request(`/epochs/claims/${A}`);
+    expect(await res.json()).toEqual([{ epoch: 0, account: A.toLowerCase(), asset: A, amount: "5", proof: [] }]);
+    expect((await app.request("/epochs/run", { method: "POST" })).status).toBe(401);
+  });
+
   it("allows cross-origin reads", async () => {
     const res = await app.request("/health", { headers: { origin: "https://example.com" } });
     expect(res.headers.get("access-control-allow-origin")).toBe("*");

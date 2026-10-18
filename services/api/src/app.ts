@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -10,9 +11,10 @@ export interface AppDeps {
   attestDeps: AttestDeps;
   dripDeps: DripDeps;
   analysisPath: string;
+  epochs?: { run: () => Promise<unknown>; adminToken: string };
 }
 
-export function createApp({ attestDeps, dripDeps, analysisPath }: AppDeps) {
+export function createApp({ attestDeps, dripDeps, analysisPath, epochs }: AppDeps) {
   const app = new Hono();
   app.use("*", cors({ origin: "*" }));
 
@@ -53,6 +55,38 @@ export function createApp({ attestDeps, dripDeps, analysisPath }: AppDeps) {
     const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const res = await drip(String(body.address ?? "") as Address, ip, dripDeps);
     return c.json(res.body, res.status as 200 | 400 | 429);
+  });
+
+  // $DRAFT basket epochs: the stored Merkle trees, so stakers can fetch their proofs.
+  app.get("/epochs", async (c) => {
+    const list = await attestDeps.store.listEpochs();
+    return c.json(list.map(({ id, start, end, root, tx }) => ({ id, start, end, root, tx })));
+  });
+
+  app.get("/epochs/claims/:account", async (c) => {
+    const account = c.req.param("account").toLowerCase();
+    const out: unknown[] = [];
+    for (const e of await attestDeps.store.listEpochs()) {
+      for (const claim of JSON.parse(e.claims) as { account: string }[]) {
+        if (claim.account.toLowerCase() === account) out.push({ epoch: e.id, ...claim });
+      }
+    }
+    return c.json(out);
+  });
+
+  app.get("/epochs/:id", async (c) => {
+    const e = await attestDeps.store.getEpoch(Number(c.req.param("id")));
+    if (!e) return c.json({ ok: false, reason: "not_found" }, 404);
+    return c.json({ ...e, claims: JSON.parse(e.claims), tree: e.tree ? JSON.parse(e.tree) : null });
+  });
+
+  app.post("/epochs/run", async (c) => {
+    const given = Buffer.from(c.req.header("authorization") ?? "");
+    const expected = Buffer.from(`Bearer ${epochs?.adminToken ?? ""}`);
+    if (!epochs || !epochs.adminToken || given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      return c.json({ ok: false, reason: "unauthorized" }, 401);
+    }
+    return c.json({ ok: true, epoch: (await epochs.run()) ?? null });
   });
 
   app.get("/analysis", async (c) => {
