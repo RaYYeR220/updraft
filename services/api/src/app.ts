@@ -52,7 +52,9 @@ export function createApp({ attestDeps, dripDeps, analysisPath, epochs }: AppDep
 
   app.post("/drip", async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    // Cloud Run appends the address it saw to whatever X-Forwarded-For the client sent, so only the
+    // last entry is real.
+    const ip = c.req.header("x-forwarded-for")?.split(",").pop()?.trim() || "unknown";
     const res = await drip(String(body.address ?? "") as Address, ip, dripDeps);
     return c.json(res.body, res.status as 200 | 400 | 429);
   });

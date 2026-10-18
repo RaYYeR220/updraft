@@ -130,6 +130,13 @@ describe("attest", () => {
     expect(res.body).toMatchObject({ ok: false, reason: "unavailable" });
   });
 
+  it("says unavailable instead of skipping the sybil check when the explorer is down", async () => {
+    const down = deps({ explorer: { ...deps().explorer, firstFunding: async () => { throw new Error("explorer 503"); } } });
+    const res = await attest({ round: ROUND, wallet: alice.address }, down);
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ ok: false, reason: "unavailable" });
+  });
+
   it("refuses rounds it does not attest for", async () => {
     expect((await attest({ round: bob.address, wallet: alice.address }, deps())).body).toMatchObject({ ok: false, reason: "unknown_round" });
     const open = deps({ chain: { ...deps().chain, roundInfo: async () => ({ mode: 0, attestor: ATTESTOR.address, closeAt: CLOSE_AT }) } });

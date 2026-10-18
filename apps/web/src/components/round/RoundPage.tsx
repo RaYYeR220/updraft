@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Address } from "viem";
-import { type Attestation, type RoundState, Status, explorerAddress, explorerTx } from "@updraft/sdk";
+import { type Attestation, type RoundState, Status, ascendTestnet, explorerAddress, explorerTx } from "@updraft/sdk";
 import type { RoundRow } from "@/lib/data";
 import { useWallet } from "@/lib/wallet";
 import { type CommitMode, CommitPanel, commitCheck, parseAmount } from "./CommitPanel";
@@ -112,6 +112,8 @@ function Round({ address }: { address: Address }) {
 
   const cfg = s.config;
   const phase: Phase = phaseOf(s.status, cfg.windows, now ?? Math.floor(Date.now() / 1000));
+  // Amounts on this page are formatted as 6-decimal USDC; other quotes get a notice instead of a form.
+  const usdcRound = cfg.quote.toLowerCase() === ascendTestnet.usdc.toLowerCase();
   useEffect(() => {
     if (phase !== "open" && mode === "withdraw") setMode("commit");
   }, [phase, mode]);
@@ -281,7 +283,16 @@ function Round({ address }: { address: Address }) {
         </div>
 
         <div className="right" ref={rightRef}>
-          {(phase === "upcoming" || phase === "open" || phase === "locked") && (
+          {(phase === "upcoming" || phase === "open" || phase === "locked") && !usdcRound && (
+            <section className="panel" aria-labelledby="h-quote">
+              <h2 id="h-quote">Your commit</h2>
+              <p className="fine">
+                This round raises in a token other than USDC. The app only handles USDC rounds so far, so commit through the SDK or
+                the contract directly: <a className="link" href={explorerAddress(s.address)} target="_blank" rel="noreferrer">the round on the explorer</a>.
+              </p>
+            </section>
+          )}
+          {(phase === "upcoming" || phase === "open" || phase === "locked") && usdcRound && (
             <>
               <CommitPanel
                 state={s}

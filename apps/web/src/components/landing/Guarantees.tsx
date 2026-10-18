@@ -65,7 +65,7 @@ export function Guarantees({ plate }: { plate: Plate | null }) {
                   <span>if</span>Ascend&apos;s curve or quote changes
                 </li>
                 <li>
-                  <span>if</span>the launch reverts
+                  <span>if</span>the launchpad is retired
                 </li>
               </ul>
               <p className="cap fm-cap">While Ascend is paused, the round waits to fire.</p>

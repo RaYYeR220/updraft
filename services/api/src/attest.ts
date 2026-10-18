@@ -72,7 +72,13 @@ export async function attest(req: AttestRequest, d: AttestDeps): Promise<AttestR
 
   const nowMs = d.now();
   const verdict = evaluate(hl.facts, nowMs);
-  const funding = await d.explorer.firstFunding(req.wallet).catch(() => null);
+  // The sybil check needs the wallet's first funding; without the explorer there is no answer, not a pass.
+  let funding: Awaited<ReturnType<typeof d.explorer.firstFunding>>;
+  try {
+    funding = await d.explorer.firstFunding(req.wallet);
+  } catch {
+    return refuse("unavailable", 503);
+  }
   const cluster = await clusterCheck(req, funding, d);
 
   const decision = !verdict.eligible ? verdict.reason : cluster ? "cluster" : "eligible";

@@ -13,6 +13,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@openzeppelin/merkle-tree": "^1.0.8",
+    "@updraft/sdk": "workspace:^",
     "hono": "4.13.13",
     "postgres": "^3.4.9",
     "viem": "2.57.7"

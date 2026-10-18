@@ -184,8 +184,8 @@ export function Rules({ state }: { state: RoundState }) {
         <div>
           <dt>Refunds</dt>
           <dd>
-            If the minimum isn't reached, the fire-by time passes, Ascend's curve or quote changes, or the launch reverts. While Ascend is
-            paused, the round waits
+            If the minimum isn't reached, the fire-by time passes, Ascend's curve or quote changes, or the launchpad is retired. While
+            Ascend is paused, or a launch attempt fails, the round waits
           </dd>
         </div>
         <div>

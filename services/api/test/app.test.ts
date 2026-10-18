@@ -47,6 +47,17 @@ describe("drip", () => {
     expect(sixth.body).toMatchObject({ ok: false, reason: "ip_limited" });
   });
 
+  it("caps all drips at twenty an hour, however many addresses and IPs ask", async () => {
+    const d = dripDeps();
+    for (let i = 1; i <= 20; i++) {
+      const addr = `0x${i.toString(16).padStart(40, "0")}` as Address;
+      expect((await drip(addr, `10.0.0.${i}`, d)).status).toBe(200);
+    }
+    const next = await drip(`0x${"ff".padStart(40, "0")}` as Address, "10.0.1.1", d);
+    expect(next.status).toBe(429);
+    expect(next.body).toMatchObject({ ok: false, reason: "busy" });
+  });
+
   it("rejects a malformed address", async () => {
     const res = await drip("0x123" as Address, "1.1.1.1", dripDeps());
     expect(res.status).toBe(400);
@@ -67,6 +78,19 @@ describe("http api", () => {
     },
     dripDeps: dripDeps(store),
     analysisPath: "does-not-exist.json",
+  });
+
+  it("limits drips by the IP Cloud Run saw, not one the client wrote into X-Forwarded-For", async () => {
+    const post = (i: number) =>
+      app.request("/drip", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": `198.51.100.${i}, 9.9.9.9` },
+        body: JSON.stringify({ address: `0x${(0xd00 + i).toString(16).padStart(40, "0")}` }),
+      });
+    for (let i = 1; i <= 5; i++) expect((await post(i)).status).toBe(200);
+    const sixth = await post(6);
+    expect(sixth.status).toBe(429);
+    expect(await sixth.json()).toMatchObject({ reason: "ip_limited" });
   });
 
   it("serves the published rules", async () => {

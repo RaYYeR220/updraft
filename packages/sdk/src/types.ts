@@ -14,7 +14,6 @@ export const AbortReasons = [
   "quote-disallowed",
   "curve-changed",
   "launchpad-revoked",
-  "launch-failed",
 ] as const;
 export type AbortReason = (typeof AbortReasons)[number];
 

@@ -454,7 +454,9 @@ updraft-mcp --http 8787     # HTTP at http://localhost:8787/mcp
                   factory revoked the launchpad. Fire aborts instead of buying on terms nobody signed up for.
                 </li>
                 <li>
-                  <span>Launch reverts</span>If Ascend’s launch call fails for any reason, fire aborts and refunds rather than reverting.
+                  <span>Launch fails</span>If Ascend’s launch call fails, fire reverts and the round stays live, so anyone can send it
+                  again. A failed launch never ends a round, so nobody can end one by making it fail; if it never succeeds, the fire-by
+                  time refunds everyone.
                 </li>
                 <li>
                   <span>Ascend paused</span>Fire waits. It can be sent again once Ascend unpauses, until the fire-by time.

@@ -187,7 +187,6 @@ const ABORT_WORDS: Record<string, string> = {
   "quote-disallowed": "Ascend stopped accepting this quote token for launches, so the round could not fire on the terms it was created with.",
   "curve-changed": "Ascend changed its launch curve after the round was created, so the price everyone committed under no longer held.",
   "launchpad-revoked": "Updraft stopped allowing this Ascend launchpad, so the round could not fire through it.",
-  "launch-failed": "Ascend's launch transaction reverted, so the round aborted instead of holding funds.",
 };
 
 export function abortWords(reason: string | number | null | undefined): string {

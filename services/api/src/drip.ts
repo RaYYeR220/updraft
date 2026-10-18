@@ -14,6 +14,8 @@ export interface DripDeps {
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
+/** All drips together, so fresh addresses from many IPs still can't empty the funding wallet. */
+const PER_HOUR = 20;
 
 /** Test funds for trying Updraft with no setup: Ascend's testnet USDC plus a little HYPE for gas. */
 export async function drip(address: Address, ip: string, d: DripDeps) {
@@ -27,8 +29,12 @@ export async function drip(address: Address, ip: string, d: DripDeps) {
   if ((await d.store.countDrips(ipKey, now - HOUR)) >= 5) {
     return { status: 429, body: { ok: false as const, reason: "ip_limited" } };
   }
+  if ((await d.store.countDrips("all", now - HOUR)) >= PER_HOUR) {
+    return { status: 429, body: { ok: false as const, reason: "busy" } };
+  }
   await d.store.putDrip(addrKey, now);
   await d.store.putDrip(ipKey, now);
+  await d.store.putDrip("all", now);
   const gasTx = await d.wallet.sendGas(address, d.gasAmount);
   const mintTx = await d.wallet.mintUsdc(address, d.usdcAmount);
   return { status: 200, body: { ok: true as const, mintTx, gasTx, usdc: d.usdcAmount.toString() } };

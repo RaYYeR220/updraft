@@ -7,9 +7,17 @@ const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** Connect a browser wallet, or try Updraft with a throwaway demo wallet funded with test USDC. */
 export function WalletButton() {
-  const { address, kind, connectInjected, startDemo, disconnect } = useWallet();
+  const { address, kind, connectInjected, startDemo, disconnect, wrongNetwork, switchNetwork } = useWallet();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+
+  if (address && wrongNetwork) {
+    return (
+      <button type="button" className="wallet connect" onClick={switchNetwork}>
+        Switch to Elysium testnet
+      </button>
+    );
+  }
 
   if (address) {
     return (

@@ -1,5 +1,5 @@
 import type { Address, Hex, PublicClient } from "viem";
-import { parseAbi } from "viem";
+import { updraftFactoryAbi, updraftRoundAbi } from "@updraft/sdk";
 
 export interface ChainReader {
   isRound(round: Address): Promise<boolean>;
@@ -13,17 +13,11 @@ export interface Explorer {
   txCount(address: Address): Promise<number>;
 }
 
-const factoryAbi = parseAbi(["function isRound(address) view returns (bool)"]);
-const roundAbi = parseAbi([
-  "function mode() view returns (uint8)",
-  "function config() view returns ((address launchpad,address quote,string name,string symbol,bytes32 tokenSalt,address creator,uint8 mode,address attestor,(uint40 openAt,uint40 lockAt,uint40 closeAt,uint40 fireBy) windows,(uint128 minRaise,uint128 maxRaise,uint128 walletCap,uint128 creatorCap) raise,(uint16 tgeBps,uint32 cliff,uint32 duration) participantVesting,(uint16 tgeBps,uint32 cliff,uint32 duration) creatorVesting,(uint16 platformBps,uint16 bidBps,uint16 stakersBps,uint16 teamBps) policy,((uint16 platformBps,uint16 bidBps,uint16 stakersBps,uint16 teamBps) min,(uint16 platformBps,uint16 bidBps,uint16 stakersBps,uint16 teamBps) max,uint32 timelock) bounds,uint256 listingCap,bool exitEnabled))",
-]);
-
 export function viemChainReader(client: PublicClient, factory: Address): ChainReader {
   return {
-    isRound: (round) => client.readContract({ address: factory, abi: factoryAbi, functionName: "isRound", args: [round] }),
+    isRound: (round) => client.readContract({ address: factory, abi: updraftFactoryAbi, functionName: "isRound", args: [round] }),
     roundInfo: async (round) => {
-      const cfg = await client.readContract({ address: round, abi: roundAbi, functionName: "config" });
+      const cfg = await client.readContract({ address: round, abi: updraftRoundAbi, functionName: "config" });
       return { mode: cfg.mode, attestor: cfg.attestor, closeAt: Number(cfg.windows.closeAt) };
     },
     isContract: async (address) => {

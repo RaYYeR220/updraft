@@ -14,7 +14,6 @@ import { useNow, useTx } from "./tx";
 
 const QUOTES = {
   usdc: { address: ascendTestnet.usdc as Address, symbol: "USDC", decimals: 6 },
-  mnvdax: { address: ascendTestnet.mnvdax as Address, symbol: "mNVDAx", decimals: 18 },
 };
 
 const factory = { address: deployment.factory, abi: updraftFactoryAbi } as const;

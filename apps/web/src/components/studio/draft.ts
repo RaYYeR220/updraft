@@ -4,7 +4,7 @@ import { type Dur, durSeconds, fmtDuration, fromLocalInput, pct, toUnits } from 
 
 export const STEPS = ["Token", "Windows", "Raise", "Mode", "Vesting", "Fees", "Review"] as const;
 
-export type QuoteKey = "usdc" | "mnvdax";
+export type QuoteKey = "usdc";
 
 export interface Draft {
   name: string;

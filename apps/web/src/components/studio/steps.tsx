@@ -51,10 +51,7 @@ export function TokenStep({ d, set, err, env, quoteName }: StepProps) {
             label="Quote token"
             value={d.quote}
             onChange={(quote) => set({ quote })}
-            options={[
-              { value: "usdc", label: "USDC" },
-              { value: "mnvdax", label: "mNVDAx" },
-            ]}
+            options={[{ value: "usdc", label: "USDC" }]}
           />
           {err("quote") ? (
             <p className="sd-err" role="alert">

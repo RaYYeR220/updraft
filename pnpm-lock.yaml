@@ -128,6 +128,9 @@ importers:
       '@openzeppelin/merkle-tree':
         specifier: ^1.0.8
         version: 1.0.8
+      '@updraft/sdk':
+        specifier: workspace:^
+        version: link:../../packages/sdk
       hono:
         specifier: 4.13.13
         version: 4.13.13
