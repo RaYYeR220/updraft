@@ -60,7 +60,7 @@ async function config(creator: Address, name: string): Promise<RoundConfig> {
     mode: Mode.Open,
     attestor: "0x0000000000000000000000000000000000000000",
     windows: { openAt: now, lockAt: now + 3000, closeAt: now + 3600, fireBy: now + 7200 },
-    raise: { minRaise: 100_000_000n, maxRaise: 50_000_000_000n, walletCap: 5_000_000_000n, creatorCap: 2_000_000_000n },
+    raise: { minRaise: 100_000_000n, maxRaise: 50_000_000_000n, walletCap: 5_000_000_000n, creatorCap: 2_000_000_000n, minCommit: 1_000_000n },
     participantVesting: { tgeBps: 10_000, cliff: 0, duration: 0 },
     creatorVesting: { tgeBps: 0, cliff: 86_400, duration: 604_800 },
     policy,

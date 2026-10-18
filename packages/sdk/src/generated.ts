@@ -66,6 +66,19 @@ export const updraftFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "MAX_FIRE_WINDOW",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_PARITY_BPS",
     "inputs": [],
     "outputs": [
@@ -296,6 +309,11 @@ export const updraftFactoryAbi = [
               },
               {
                 "name": "creatorCap",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "minCommit",
                 "type": "uint128",
                 "internalType": "uint128"
               }
@@ -1053,6 +1071,11 @@ export const updraftFactoryAbi = [
   },
   {
     "type": "error",
+    "name": "BadListingCap",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BadParams",
     "inputs": []
   },
@@ -1135,6 +1158,11 @@ export const updraftFactoryAbi = [
     "type": "error",
     "name": "WeakCreatorVesting",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroCreator",
+    "inputs": []
   }
 ] as const;
 
@@ -1186,19 +1214,6 @@ export const updraftRoundAbi = [
         "name": "",
         "type": "uint8",
         "internalType": "enum AbortReason"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "balanceAtAbort",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -1491,6 +1506,11 @@ export const updraftRoundAbi = [
               },
               {
                 "name": "creatorCap",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "minCommit",
                 "type": "uint128",
                 "internalType": "uint128"
               }
@@ -1911,6 +1931,11 @@ export const updraftRoundAbi = [
               },
               {
                 "name": "creatorCap",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "minCommit",
                 "type": "uint128",
                 "internalType": "uint128"
               }
@@ -2334,25 +2359,6 @@ export const updraftRoundAbi = [
   },
   {
     "type": "function",
-    "name": "quoteRefunded",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "quoteUsed",
     "inputs": [],
     "outputs": [
@@ -2370,6 +2376,25 @@ export const updraftRoundAbi = [
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "refundPaid",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -2399,6 +2424,19 @@ export const updraftRoundAbi = [
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "remainingCommitted",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -2767,12 +2805,27 @@ export const updraftRoundAbi = [
   },
   {
     "type": "error",
+    "name": "BelowMinCommit",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "Closed",
     "inputs": []
   },
   {
     "type": "error",
+    "name": "EscrowShort",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "IdentityTaken",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LaunchpadPaused",
     "inputs": []
   },
   {
@@ -2963,6 +3016,20 @@ export const creatorVaultAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "cancelExit",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelListing",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -3240,30 +3307,6 @@ export const creatorVaultAbi = [
   },
   {
     "type": "function",
-    "name": "isValidSignature",
-    "inputs": [
-      {
-        "name": "hash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "launchpad",
     "inputs": [],
     "outputs": [
@@ -3471,32 +3514,6 @@ export const creatorVaultAbi = [
   },
   {
     "type": "function",
-    "name": "queuedQuote",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "queuedToken",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "quote",
     "inputs": [],
     "outputs": [
@@ -3685,6 +3702,12 @@ export const creatorVaultAbi = [
   },
   {
     "type": "event",
+    "name": "ExitCancelled",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ExitQueued",
     "inputs": [
       {
@@ -3717,6 +3740,12 @@ export const creatorVaultAbi = [
   },
   {
     "type": "event",
+    "name": "ListingCancelled",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ListingEnrolled",
     "inputs": [
       {
@@ -3743,6 +3772,19 @@ export const creatorVaultAbi = [
         "type": "uint40",
         "indexed": false,
         "internalType": "uint40"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ListingRefused",
+    "inputs": [
+      {
+        "name": "cap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -3949,6 +3991,11 @@ export const creatorVaultAbi = [
   {
     "type": "error",
     "name": "ExitDisabled",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientGas",
     "inputs": []
   },
   {
@@ -4432,39 +4479,8 @@ export const updraftStakingAbi = [
   },
   {
     "type": "function",
-    "name": "MAX_REWARD_ASSETS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "claim",
+    "name": "available",
     "inputs": [
-      {
-        "name": "assets",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "earned",
-    "inputs": [
-      {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      },
       {
         "name": "asset",
         "type": "address",
@@ -4482,8 +4498,81 @@ export const updraftStakingAbi = [
   },
   {
     "type": "function",
-    "name": "isRewardAsset",
+    "name": "claim",
     "inputs": [
+      {
+        "name": "epoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "claimMany",
+    "inputs": [
+      {
+        "name": "claims",
+        "type": "tuple[]",
+        "internalType": "struct UpdraftStaking.ClaimArgs[]",
+        "components": [
+          {
+            "name": "epoch",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "proof",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "claimed",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "",
         "type": "address",
@@ -4501,7 +4590,7 @@ export const updraftStakingAbi = [
   },
   {
     "type": "function",
-    "name": "notify",
+    "name": "deposit",
     "inputs": [
       {
         "name": "asset",
@@ -4519,6 +4608,74 @@ export const updraftStakingAbi = [
   },
   {
     "type": "function",
+    "name": "distributor",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "epochCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "epochs",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "root",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "start",
+        "type": "uint40",
+        "internalType": "uint40"
+      },
+      {
+        "name": "end",
+        "type": "uint40",
+        "internalType": "uint40"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "genesis",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint40",
+        "internalType": "uint40"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -4532,22 +4689,42 @@ export const updraftStakingAbi = [
   },
   {
     "type": "function",
-    "name": "queued",
+    "name": "postEpoch",
     "inputs": [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
+        "name": "root",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "end",
+        "type": "uint40",
+        "internalType": "uint40"
+      },
+      {
+        "name": "assets",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "amounts",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "uri",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "id",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -4570,35 +4747,16 @@ export const updraftStakingAbi = [
   },
   {
     "type": "function",
-    "name": "rewardAssets",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "rewardPerToken",
+    "name": "setDistributor",
     "inputs": [
       {
-        "name": "",
+        "name": "distributor_",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -4689,7 +4847,13 @@ export const updraftStakingAbi = [
     "name": "Claimed",
     "inputs": [
       {
-        "name": "user",
+        "name": "epoch",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -4705,13 +4869,19 @@ export const updraftStakingAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "paid",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "Notified",
+    "name": "Deposited",
     "inputs": [
       {
         "name": "asset",
@@ -4730,6 +4900,68 @@ export const updraftStakingAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DistributorSet",
+    "inputs": [
+      {
+        "name": "distributor",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EpochPosted",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "root",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "start",
+        "type": "uint40",
+        "indexed": false,
+        "internalType": "uint40"
+      },
+      {
+        "name": "end",
+        "type": "uint40",
+        "indexed": false,
+        "internalType": "uint40"
+      },
+      {
+        "name": "assets",
+        "type": "address[]",
+        "indexed": false,
+        "internalType": "address[]"
+      },
+      {
+        "name": "amounts",
+        "type": "uint256[]",
+        "indexed": false,
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "uri",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
       }
     ],
     "anonymous": false
@@ -4762,6 +4994,18 @@ export const updraftStakingAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalStaked",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -4781,13 +5025,55 @@ export const updraftStakingAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalStaked",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
   },
   {
     "type": "error",
+    "name": "AlreadyClaimed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BadProof",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BadWindow",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LengthMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotDistributor",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OverAllocated",
     "inputs": []
   },
   {
@@ -4808,11 +5094,6 @@ export const updraftStakingAbi = [
   {
     "type": "error",
     "name": "StakeTokenUnset",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TooManyAssets",
     "inputs": []
   },
   {
@@ -5228,6 +5509,44 @@ export const ascendLaunchpadAbi = [
   },
   {
     "type": "function",
+    "name": "listingElection",
+    "inputs": [
+      {
+        "name": "poolId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "listingOwed",
+    "inputs": [
+      {
+        "name": "poolId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -5522,4 +5841,16 @@ export const ascendLaunchpadAbi = [
 
 export const ascendTokenCreationCode = "0x60e0806040523461046157610f2d803803809161001c8285610465565b83398101906060818303126104615780516001600160401b0381116104615782610047918301610488565b60208201519092906001600160401b0381116104615760409161006b918401610488565b91015182516001600160401b038111610392576100885f546104dd565b601f8111610412575b506020601f82116001146103b157819293945f926103a6575b50508160011b915f199060031b1c1916175f555b81516001600160401b038111610392576100d96001546104dd565b601f811161032f575b50602092601f82116001146102ce57928192935f926102c3575b50508160011b915f199060031b1c1916176001555b60126080524660a0526040515f905f54918161012c846104dd565b9182825260208201946001811690815f146102a7575060011461025d575b61015692500382610465565b51902060405160208101917f8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f835260408201527fc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc660608201524660808201523060a082015260a081526101ca60c082610465565b51902060c05260025481810180911161024957600255335f52600360205260405f208181540190556040519081525f7fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60203393a36040516109f79081610516823960805181610511015260a0518161081d015260c051816108430152f35b634e487b7160e01b5f52601160045260245ffd5b505f80805290915f516020610f0d5f395f51905f525b81831061028b5750509060206101569282010161014a565b6020919350806001915483858801015201910190918392610273565b60ff191686525061015692151560051b8201602001905061014a565b015190505f806100fc565b601f1982169360015f52805f20915f5b86811061031757508360019596106102ff575b505050811b01600155610111565b01515f1960f88460031b161c191690555f80806102f1565b919260206001819286850151815501940192016102de565b60015f527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6601f830160051c81019160208410610388575b601f0160051c01905b81811061037d57506100e2565b5f8155600101610370565b9091508190610367565b634e487b7160e01b5f52604160045260245ffd5b015190505f806100aa565b601f198216905f8052805f20915f5b8181106103fa575095836001959697106103e2575b505050811b015f556100be565b01515f1960f88460031b161c191690555f80806103d5565b9192602060018192868b0151815501940192016103c0565b5f80525f516020610f0d5f395f51905f52601f830160051c81019160208410610457575b601f0160051c01905b81811061044c5750610091565b5f815560010161043f565b9091508190610436565b5f80fd5b601f909101601f19168101906001600160401b0382119082101761039257604052565b81601f82011215610461578051906001600160401b03821161039257604051926104bc601f8401601f191660200185610465565b8284526020838301011161046157815f9260208093018386015e8301015290565b90600182811c9216801561050b575b60208310146104f757565b634e487b7160e01b5f52602260045260245ffd5b91607f16916104ec56fe60806040526004361015610011575f80fd5b5f3560e01c806306fdde03146106b4578063095ea7b31461063b57806318160ddd1461061e57806323b872dd14610535578063313ce567146104f85780633644e515146104d657806370a082311461049e5780637ecebe001461046657806395d89b411461038c578063a9059cbb146102fb578063d505accf146100f15763dd62ed3e1461009d575f80fd5b346100ed5760403660031901126100ed576100b66107ee565b6100be610804565b6001600160a01b039182165f908152600460209081526040808320949093168252928352819020549051908152f35b5f80fd5b346100ed5760e03660031901126100ed5761010a6107ee565b610112610804565b6044356064359260843560ff81168091036100ed574285106102b65760805f9160209361013d61081a565b9060018060a01b03169687855260058652604085209889549960018b01905560405190878201927f6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c984528a604084015260018060a01b03169a8b6060840152898784015260a083015260c082015260c081526101ba60e08261078e565b519020604051908682019261190160f01b845260228301526042820152604281526101e660628261078e565b519020906040519182528482015260a435604082015260c435606082015282805260015afa156102ab575f516001600160a01b0316801515806102a2575b1561026c577f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925916020915f526004825260405f20855f5282528060405f2055604051908152a3005b60405162461bcd60e51b815260206004820152600e60248201526d24a72b20a624a22fa9a4a3a722a960911b6044820152606490fd5b50828114610224565b6040513d5f823e3d90fd5b60405162461bcd60e51b815260206004820152601760248201527f5045524d49545f444541444c494e455f455850495245440000000000000000006044820152606490fd5b346100ed5760403660031901126100ed576103146107ee565b6024359061032181610994565b335f52600360205260405f206103388382546109c9565b905560018060a01b031690815f52600360205260405f208181540190556040519081527fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60203392a3602060405160018152f35b346100ed575f3660031901126100ed576040515f6001546103ac81610756565b808452906001811690811561044257506001146103e4575b6103e0836103d48185038261078e565b604051918291826107c4565b0390f35b60015f9081527fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6939250905b808210610428575090915081016020016103d46103c4565b919260018160209254838588010152019101909291610410565b60ff191660208086019190915291151560051b840190910191506103d490506103c4565b346100ed5760203660031901126100ed576001600160a01b036104876107ee565b165f526005602052602060405f2054604051908152f35b346100ed5760203660031901126100ed576001600160a01b036104bf6107ee565b165f526003602052602060405f2054604051908152f35b346100ed575f3660031901126100ed5760206104f061081a565b604051908152f35b346100ed575f3660031901126100ed57602060405160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b346100ed5760603660031901126100ed5761054e6107ee565b610556610804565b7fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60206044359361058684610994565b6001600160a01b03165f818152600483526040808220338352845290205490939085600182016105f9575b5050835f526003825260405f206105c98682546109c9565b90556001600160a01b03165f818152600383526040908190208054870190555194855293a3602060405160018152f35b610602916109c9565b5f858152600484526040808220338352855290205585856105b1565b346100ed575f3660031901126100ed576020600254604051908152f35b346100ed5760403660031901126100ed576106546107ee565b335f8181526004602090815260408083206001600160a01b03909516808452948252918290206024359081905591519182527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b92591a3602060405160018152f35b346100ed575f3660031901126100ed576040515f5f546106d381610756565b808452906001811690811561044257506001146106fa576103e0836103d48185038261078e565b5f8080527f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563939250905b80821061073c575090915081016020016103d46103c4565b919260018160209254838588010152019101909291610724565b90600182811c92168015610784575b602083101461077057565b634e487b7160e01b5f52602260045260245ffd5b91607f1691610765565b90601f8019910116810190811067ffffffffffffffff8211176107b057604052565b634e487b7160e01b5f52604160045260245ffd5b602060409281835280519182918282860152018484015e5f828201840152601f01601f1916010190565b600435906001600160a01b03821682036100ed57565b602435906001600160a01b03821682036100ed57565b467f000000000000000000000000000000000000000000000000000000000000000003610865577f000000000000000000000000000000000000000000000000000000000000000090565b6040515f905f54918161087784610756565b9182825260208201946001811690815f14610978575060011461091b575b6108a19250038261078e565b51902060405160208101917f8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f835260408201527fc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc660608201524660808201523060a082015260a0815261091560c08261078e565b51902090565b505f80805290917f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5635b81831061095c5750509060206108a192820101610895565b6020919350806001915483858801015201910190918392610944565b60ff19168652506108a192151560051b82016020019050610895565b6001600160a01b031680159081156109bd575b506109ae57565b634e46966960e11b5f5260045ffd5b61dead9150145f6109a7565b919082039182116109d657565b634e487b7160e01b5f52601160045260245ffdfea164736f6c634300081e000a290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563" as const;
 
-export const elysiumTestnetDeployment = undefined;
+export const elysiumTestnetDeployment = {
+  "attestor": "0xEb596FD067a24a23df95D634EB926aA058237789",
+  "certificate": "0x7832840c32ACd63522344ce236D7EAa8D9ba01df",
+  "chainId": 99801,
+  "deployBlock": 11068309,
+  "distributor": "0x99BD3d593C73422CB75ab9A0091EDe8fAA9348f9",
+  "factory": "0x312c860E09e9B74AAEa56a8CE7a3E617ADcD2168",
+  "launchpad": "0x6d01f6644bbf1b5074472D3e85aa1465B4d2bF3d",
+  "lens": "0xeF8673a6E33E6c63941BEdB7245B1ca02e46bD02",
+  "roundImplementation": "0x965556Fc4F0a08160DC20B7041c1f7A92290291f",
+  "staking": "0x597f19Fc9E8Dc981A504B46bf350c2165d6eccEb",
+  "vaultImplementation": "0x7915BE941778e3c03C287066D26fA8DB55b1e85b"
+} as const;

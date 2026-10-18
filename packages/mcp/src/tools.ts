@@ -38,7 +38,7 @@ const roundConfig = z.object({
   mode: z.union([z.literal(0), z.literal(1)]),
   attestor: address,
   windows: z.object({ openAt: z.number(), lockAt: z.number(), closeAt: z.number(), fireBy: z.number() }),
-  raise: z.object({ minRaise: uint, maxRaise: uint, walletCap: uint, creatorCap: uint }),
+  raise: z.object({ minRaise: uint, maxRaise: uint, walletCap: uint, creatorCap: uint, minCommit: uint }),
   participantVesting: vesting,
   creatorVesting: vesting,
   policy,
@@ -144,6 +144,7 @@ export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch, now
             maxRaise: BigInt(c.raise.maxRaise),
             walletCap: BigInt(c.raise.walletCap),
             creatorCap: BigInt(c.raise.creatorCap),
+            minCommit: BigInt(c.raise.minCommit),
           },
           listingCap: BigInt(c.listingCap),
         };

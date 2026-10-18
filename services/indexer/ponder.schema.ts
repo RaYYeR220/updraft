@@ -19,6 +19,7 @@ export const round = onchainTable(
     maxRaise: t.bigint().notNull(),
     walletCap: t.bigint().notNull(),
     creatorCap: t.bigint().notNull(),
+    minCommit: t.bigint().notNull(),
     status: t.text().notNull(),
     abortReason: t.integer(),
     totalCommitted: t.bigint().notNull(),

@@ -12,7 +12,8 @@ import {ASCEND_TOKEN_CREATION_CODE} from "../src/ascend/AscendTokenCode.sol";
 import {Params} from "../src/interfaces/IUpdraft.sol";
 
 /// @notice Deploys Updraft on Elysium testnet and accepts Ascend's current launchpad.
-/// Env: DEPLOYER_PRIVATE_KEY, ATTESTOR_ADDRESS; optional ASCEND_LAUNCHPAD, ASCEND_OWNER, DEPLOYMENTS_FILE.
+/// Env: DEPLOYER_PRIVATE_KEY, ATTESTOR_ADDRESS; optional DISTRIBUTOR_ADDRESS, ASCEND_LAUNCHPAD,
+/// ASCEND_OWNER, DEPLOYMENTS_FILE.
 contract Deploy is Script {
     address internal constant DEFAULT_LAUNCHPAD = 0x6d01f6644bbf1b5074472D3e85aa1465B4d2bF3d;
     address internal constant DEFAULT_ASCEND_OWNER = 0x5Fa637713b819d6314e139291De2Bfa7b7cD70eB;
@@ -21,6 +22,7 @@ contract Deploy is Script {
         uint256 key = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(key);
         address attestor = vm.envAddress("ATTESTOR_ADDRESS");
+        address distributor = vm.envOr("DISTRIBUTOR_ADDRESS", deployer);
         address launchpad = vm.envOr("ASCEND_LAUNCHPAD", DEFAULT_LAUNCHPAD);
         address ascendOwner = vm.envOr("ASCEND_OWNER", DEFAULT_ASCEND_OWNER);
 
@@ -40,6 +42,7 @@ contract Deploy is Script {
         certificate.setFactory(address(factory));
         factory.allowLaunchpad(launchpad, ascendOwner, ASCEND_TOKEN_CREATION_CODE);
         factory.setAttestor(attestor, true);
+        staking.setDistributor(distributor);
         UpdraftLens lens = new UpdraftLens();
         vm.stopBroadcast();
 
@@ -53,6 +56,7 @@ contract Deploy is Script {
         vm.serializeAddress(o, "staking", address(staking));
         vm.serializeAddress(o, "lens", address(lens));
         vm.serializeAddress(o, "attestor", attestor);
+        vm.serializeAddress(o, "distributor", distributor);
         string memory json = vm.serializeAddress(o, "launchpad", launchpad);
         string memory outFile = vm.envOr("DEPLOYMENTS_FILE", string("elysium-testnet.json"));
         vm.writeJson(json, string.concat(vm.projectRoot(), "/../deployments/", outFile));

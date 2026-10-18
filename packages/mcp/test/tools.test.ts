@@ -89,7 +89,7 @@ describe("mcp tools", () => {
       mode: 0,
       attestor: "0x0000000000000000000000000000000000000000",
       windows: { openAt: 1, lockAt: 2, closeAt: 3, fireBy: 4 },
-      raise: { minRaise: "100000000", maxRaise: "50000000000", walletCap: "5000000000", creatorCap: "2000000000" },
+      raise: { minRaise: "100000000", maxRaise: "50000000000", walletCap: "5000000000", creatorCap: "2000000000", minCommit: "1000000" },
       participantVesting: { tgeBps: 10000, cliff: 0, duration: 0 },
       creatorVesting: { tgeBps: 0, cliff: 86400, duration: 604800 },
       policy: { platformBps: 1000, bidBps: 3000, stakersBps: 3000, teamBps: 3000 },

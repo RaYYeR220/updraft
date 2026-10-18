@@ -14,6 +14,7 @@ export const AbortReasons = [
   "quote-disallowed",
   "curve-changed",
   "launchpad-revoked",
+  "launch-failed",
 ] as const;
 export type AbortReason = (typeof AbortReasons)[number];
 
@@ -29,6 +30,8 @@ export interface Raise {
   maxRaise: bigint;
   walletCap: bigint;
   creatorCap: bigint;
+  /** Smallest commit, and smallest balance a wallet may leave behind (0 or at least this). */
+  minCommit: bigint;
 }
 
 export interface Vesting {
@@ -124,6 +127,7 @@ export interface Deployment {
   staking: Address;
   lens: Address;
   attestor: Address;
+  distributor: Address;
   launchpad: Address;
 }
 

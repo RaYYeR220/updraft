@@ -30,6 +30,7 @@ ponder.on("UpdraftFactory:RoundCreated", async ({ event, context }) => {
     maxRaise: cfg.raise.maxRaise,
     walletCap: cfg.raise.walletCap,
     creatorCap: cfg.raise.creatorCap,
+    minCommit: cfg.raise.minCommit,
     status: "live",
     totalCommitted: 0n,
     participants: 0,
