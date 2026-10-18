@@ -14,6 +14,7 @@ const unstaked = parseAbiItem("event Unstaked(address indexed user, uint256 amou
 const deposited = parseAbiItem("event Deposited(address indexed asset, address indexed from, uint256 amount)");
 const factoryAbi = parseAbi(["function isRound(address) view returns (bool)"]);
 const vaultAbi = parseAbi(["function round() view returns (address)"]);
+const roundAbi = parseAbi(["function vault() view returns (address)"]);
 
 type Timed = { blockTimestamp?: Hex; blockNumber: bigint | null };
 
@@ -33,7 +34,7 @@ export function viemEpochChain(opts: {
     return Number(block.timestamp);
   }
 
-  /** A round created by the factory, or a vault installed by one. */
+  /** A round created by the factory, or the vault such a round installed (they must point at each other). */
   async function updraftSource(from: Address): Promise<boolean> {
     const key = from.toLowerCase();
     if (isSource.has(key)) return isSource.get(key)!;
@@ -41,7 +42,11 @@ export function viemEpochChain(opts: {
     if (!ok) {
       try {
         const round = await publicClient.readContract({ address: from, abi: vaultAbi, functionName: "round" });
-        ok = await publicClient.readContract({ address: factory, abi: factoryAbi, functionName: "isRound", args: [round] });
+        const isRound = await publicClient.readContract({ address: factory, abi: factoryAbi, functionName: "isRound", args: [round] });
+        const installed = isRound
+          ? await publicClient.readContract({ address: round, abi: roundAbi, functionName: "vault" })
+          : null;
+        ok = !!installed && installed.toLowerCase() === key;
       } catch {
         ok = false;
       }
@@ -68,7 +73,13 @@ export function viemEpochChain(opts: {
       for (const l of logs) if (await updraftSource(l.args.from!)) assets.add(l.args.asset!);
       return [...assets];
     },
-    available: (asset) => publicClient.readContract({ address: staking, abi: stakingAbi, functionName: "available", args: [asset] }),
+    available: async (asset) => {
+      try {
+        return await publicClient.readContract({ address: staking, abi: stakingAbi, functionName: "available", args: [asset] });
+      } catch {
+        return 0n; // a token whose balanceOf misbehaves is skipped, never blocks the epoch
+      }
+    },
     nextStart: async () => {
       const count = await publicClient.readContract({ address: staking, abi: stakingAbi, functionName: "epochCount" });
       if (count === 0n) return Number(await publicClient.readContract({ address: staking, abi: stakingAbi, functionName: "genesis" }));

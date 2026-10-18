@@ -4,6 +4,7 @@
 //
 //   node --experimental-strip-types scripts/rehearsal.ts --name "Rehearsal One" --symbol REH1 \
 //     --amounts 150,250,400,600 --close-in 240 [--max-raise 50000] [--min-raise 100] [--out file.json]
+//     [--sniper 100]   a bot buys this many USDC through Ascend right after fire, for comparison
 //
 // Env: ELYSIUM_RPC, FUNDER_PRIVATE_KEY (pays gas, mints test USDC), CREATOR_PRIVATE_KEY.
 import { writeFileSync } from "node:fs";
@@ -33,6 +34,10 @@ const creatorAccount = privateKeyToAccount(process.env.CREATOR_PRIVATE_KEY as He
 const creatorWallet = createWalletClient({ account: creatorAccount, chain, transport });
 const creatorClient = createUpdraftClient({ publicClient, walletClient: creatorWallet, deployment });
 const mintAbi = parseAbi(["function mint(address to, uint256 value)"]);
+const erc20Abi = parseAbi(["function approve(address, uint256) returns (bool)", "function balanceOf(address) view returns (uint256)"]);
+const swapperAbi = parseAbi(["function buy(address token, address quote, uint256 quoteIn, address to) returns (uint256)"]);
+const launchpadAbi = parseAbi(["function currentFee(bytes32 poolId) view returns (uint24)"]);
+const SWAPPER = (process.env.SWAPPER ?? "0xf16716e1De1E091724723690bd95056912D03016") as Address;
 
 const USDC = 1_000_000n;
 const amounts = String(args.amounts ?? "150,250,400,600").split(",").map((a) => BigInt(Math.round(Number(a) * 1e6)));
@@ -102,8 +107,43 @@ async function main() {
     if (t >= cfg.windows.closeAt) break;
     await new Promise((r) => setTimeout(r, 5_000));
   }
+  // A sniper is ready before T0 and buys the moment the launch lands.
+  const sniperAmount = args.sniper ? BigInt(Math.round(Number(args.sniper) * 1e6)) : 0n;
+  const sniper = privateKeyToAccount(generatePrivateKey());
+  const sniperWallet = createWalletClient({ account: sniper, chain, transport });
+  if (sniperAmount > 0n) {
+    await sent("gas → sniper", await funder.sendTransaction({ to: sniper.address, value: parseEther("0.0003") }));
+    await sent(
+      "mint USDC → sniper",
+      await funder.writeContract({ address: ascendTestnet.usdc, abi: mintAbi, functionName: "mint", args: [sniper.address, sniperAmount] }),
+    );
+    await sent(
+      "sniper approves swapper",
+      await sniperWallet.writeContract({ address: ascendTestnet.usdc, abi: erc20Abi, functionName: "approve", args: [SWAPPER, sniperAmount] }),
+    );
+  }
+
   await sent("fire", await creatorClient.fire(round));
   const fired = await creatorClient.getRound(round);
+  let sniperReport: Record<string, string> | undefined;
+  if (sniperAmount > 0n && fired.fired) {
+    const fee = await publicClient.readContract({ address: ascendTestnet.launchpad, abi: launchpadAbi, functionName: "currentFee", args: [fired.fired.poolId] });
+    await sent(
+      "sniper buys right after fire",
+      await sniperWallet.writeContract({ address: SWAPPER, abi: swapperAbi, functionName: "buy", args: [fired.fired.token, ascendTestnet.usdc, sniperAmount, sniper.address] }),
+    );
+    const got = await publicClient.readContract({ address: fired.fired.token, abi: erc20Abi, functionName: "balanceOf", args: [sniper.address] });
+    const batchPerUsdc = (fired.fired.netTokens * USDC) / fired.fired.quoteUsed;
+    const sniperPerUsdc = (got * USDC) / sniperAmount;
+    sniperReport = {
+      sniper: sniper.address,
+      launchFeeAtFirePips: String(fee),
+      batchTokensPerUsdc: batchPerUsdc.toString(),
+      sniperTokensPerUsdc: sniperPerUsdc.toString(),
+      batchAdvantage: (Number(batchPerUsdc) / Number(sniperPerUsdc)).toFixed(2),
+    };
+    console.log(`batch got ${sniperReport.batchAdvantage}x the tokens per USDC that the sniper got`);
+  }
   await sent("distribute", await creatorClient.distribute(round, 0n, BigInt(fired.participantCount)));
 
   const out = {
@@ -114,6 +154,7 @@ async function main() {
     quoteUsed: fired.fired?.quoteUsed.toString(),
     tokensOut: fired.fired?.tokensOut.toString(),
     participants: participants.map((p, i) => ({ address: p.address, committed: amounts[i].toString() })),
+    sniper: sniperReport,
     transactions: log,
   };
   if (args.out) writeFileSync(String(args.out), JSON.stringify(out, null, 2));
