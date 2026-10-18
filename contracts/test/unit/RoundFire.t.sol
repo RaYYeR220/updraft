@@ -125,13 +125,15 @@ contract RoundFireTest is RoundTestBase {
         assertEq(certificate.get(r.token()).shortfall, 250e6);
     }
 
-    function test_fire_whenPaused_aborts() public {
+    function test_fire_whenPaused_waits() public {
         UpdraftRound r = _round(_defaultConfig());
         _commit(r, alice, 500e6);
         lp.setPaused(true);
         vm.warp(block.timestamp + 1 hours);
+        vm.expectRevert(UpdraftRound.LaunchpadPaused.selector);
         r.fire();
-        assertEq(uint8(r.abortReason()), uint8(AbortReason.LaunchpadPaused));
+        vm.warp(block.timestamp + 1 hours + 1);
+        r.abort(); // still refundable once the deadline passes
         vm.prank(alice);
         r.refundAborted();
         assertEq(usdc.balanceOf(alice), 500e6);

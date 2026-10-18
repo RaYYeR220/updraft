@@ -50,7 +50,7 @@ contract FactoryTest is Test {
         cfg.creator = creator;
         cfg.mode = Mode.Open;
         cfg.windows = Windows({openAt: t, lockAt: t + 50 minutes, closeAt: t + 1 hours, fireBy: t + 2 hours});
-        cfg.raise = Raise({minRaise: 100e6, maxRaise: 50_000e6, walletCap: 5_000e6, creatorCap: 2_000e6});
+        cfg.raise = Raise({minRaise: 100e6, maxRaise: 50_000e6, walletCap: 5_000e6, creatorCap: 2_000e6, minCommit: 1e6});
         cfg.participantVesting = Vesting({tgeBps: 10_000, cliff: 0, duration: 0});
         cfg.creatorVesting = Vesting({tgeBps: 0, cliff: 1 days, duration: 7 days});
         cfg.policy = Policy({platformBps: 1000, bidBps: 3000, stakersBps: 3000, teamBps: 3000});
@@ -214,6 +214,46 @@ contract FactoryTest is Test {
         factory.setParams(p);
         assertEq(UpdraftRound(round).params().parityBps, 100);
         assertEq(UpdraftRound(round).params().platformFeeBps, 1000);
+    }
+
+    // Self-audit regressions (F06, F13, I2) and the minimum-commit bound.
+    function test_create_rejectsZeroCreator() public {
+        RoundConfig memory cfg = _cfg();
+        cfg.creator = address(0);
+        vm.expectRevert(UpdraftFactory.ZeroCreator.selector);
+        factory.createRound(cfg, 0);
+    }
+
+    function test_create_rejectsLongFireWindow() public {
+        RoundConfig memory cfg = _cfg();
+        cfg.windows.fireBy = cfg.windows.closeAt + 7 days + 1;
+        vm.expectRevert(UpdraftFactory.BadWindows.selector);
+        factory.createRound(cfg, 0);
+    }
+
+    function test_create_rejectsListingCapOverUint88() public {
+        RoundConfig memory cfg = _cfg();
+        cfg.listingCap = uint256(type(uint88).max) + 1;
+        vm.expectRevert(UpdraftFactory.BadListingCap.selector);
+        factory.createRound(cfg, 0);
+    }
+
+    function test_create_rejectsLongParticipantLock() public {
+        RoundConfig memory cfg = _cfg();
+        cfg.participantVesting = Vesting({tgeBps: 0, cliff: 365 days, duration: 1 days});
+        cfg.creatorVesting = Vesting({tgeBps: 0, cliff: 400 days, duration: 1 days});
+        vm.expectRevert(UpdraftFactory.BadVesting.selector);
+        factory.createRound(cfg, 0);
+    }
+
+    function test_create_rejectsBadMinCommit() public {
+        RoundConfig memory cfg = _cfg();
+        cfg.raise.minCommit = 0;
+        vm.expectRevert(UpdraftFactory.BadRaise.selector);
+        factory.createRound(cfg, 0);
+        cfg.raise.minCommit = cfg.raise.walletCap + 1;
+        vm.expectRevert(UpdraftFactory.BadRaise.selector);
+        factory.createRound(cfg, 0);
     }
 
     function test_revokeLaunchpad() public {

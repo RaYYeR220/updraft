@@ -24,6 +24,7 @@ contract RoundHandler is Test {
     uint256 public deposited;
     uint256 public paidOut;
     uint256 public burned;
+    uint256 public minted;
     bool public everLeftLive;
 
     constructor(UpdraftRound round_, BurnableUsdc usdc_, address[] memory actors_) {
@@ -38,7 +39,7 @@ contract RoundHandler is Test {
 
     function commit(uint256 seed, uint256 amount) external {
         address a = _actor(seed);
-        amount = bound(amount, 1, 1_500e6);
+        amount = bound(amount, 1e6, 1_500e6);
         usdc.mint(a, amount);
         vm.startPrank(a);
         usdc.approve(address(round), amount);
@@ -63,12 +64,19 @@ contract RoundHandler is Test {
         } catch {}
     }
 
+    /// Anyone can burn or mint Ascend's testnet stables, before or after fire/abort.
     function burnEscrow(uint256 bps) external {
         bps = bound(bps, 1, 3_000);
         uint256 amount = usdc.balanceOf(address(round)) * bps / 10_000;
-        if (amount == 0 || round.status() == Status.Fired) return;
+        if (amount == 0) return;
         usdc.burn(address(round), amount);
         burned += amount;
+    }
+
+    function mintEscrow(uint256 amount) external {
+        amount = bound(amount, 1, 2 ** 200);
+        usdc.mint(address(round), amount);
+        minted += amount;
     }
 
     function warp(uint256 secs) external {
@@ -164,7 +172,7 @@ contract RoundInvariantsTest is RoundTestBase {
         uint256 used = round.status() == Status.Fired ? round.quoteUsed() : 0;
         assertEq(
             handler.paidOut() + usdc.balanceOf(address(round)) + handler.burned() + used,
-            handler.deposited(),
+            handler.deposited() + handler.minted(),
             "quote is conserved"
         );
     }

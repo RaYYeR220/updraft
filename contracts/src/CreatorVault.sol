@@ -3,13 +3,13 @@ pragma solidity 0.8.30;
 
 import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {ECDSA} from "solady/utils/ECDSA.sol";
+import {FixedPointMathLib as FPM} from "solady/utils/FixedPointMathLib.sol";
 import {IAscendLaunchpad} from "./interfaces/IAscendLaunchpad.sol";
 import {IListingDesk} from "./interfaces/IListingDesk.sol";
 import {Policy, PolicyBounds} from "./interfaces/IUpdraft.sol";
 
-interface IStakingNotify {
-    function notify(address asset, uint256 amount) external;
+interface IStakingDepositor {
+    function deposit(address asset, uint256 amount) external;
 }
 
 /// @notice Holds an Ascend launch's creator role and routes its fees by a published policy.
@@ -17,12 +17,18 @@ interface IStakingNotify {
 /// so nobody can quietly redirect the fees to themselves overnight.
 /// @dev Fees can arrive without harvest() (anyone may call the launchpad's claim, which pays the
 /// role holder), so routing works on balance deltas: whatever the vault holds beyond what it owes
-/// (staked principal, team balance, staker rewards) is new income.
+/// (staked principal, team balance, staker rewards) is new income. Every state change that moves
+/// stake or policy first pulls what Ascend owes, so fees always follow the split and the stakers
+/// that were in place when they accrued.
 contract CreatorVault is ReentrancyGuard {
     using SafeTransferLib for address;
 
     uint256 internal constant SCALE = 1e36;
-    bytes4 internal constant ERC1271_MAGIC = 0x1626ba7e;
+    /// @dev Bounds the quote credited per checkpoint (far above any real fee flow), so a minted
+    /// testnet balance can never overflow the reward accumulator.
+    uint256 internal constant MAX_QUOTE_INCOME = 1e30;
+    /// @dev Gas kept for the fee pull before a policy change or exit, so it cannot be starved.
+    uint256 internal constant PULL_GAS_FLOOR = 1_500_000;
 
     struct InitParams {
         address launchpad;
@@ -47,15 +53,19 @@ contract CreatorVault is ReentrancyGuard {
     error ExitDisabled();
     error ZeroAmount();
     error OverStaked();
+    error InsufficientGas();
 
     event Routed(uint256 quoteIncome, uint256 tokenIncome);
     event PolicyQueued(Policy policy, uint40 eta);
     event PolicyExecuted(Policy policy);
     event PolicyCancelled();
     event ExitQueued(address indexed to, uint40 eta);
+    event ExitCancelled();
     event Exited(address indexed to);
     event ListingQueued(uint256 cap, uint40 eta);
+    event ListingCancelled();
     event ListingEnrolled(uint256 cap);
+    event ListingRefused(uint256 cap);
     event Staked(address indexed user, uint256 amount);
     event Unstaked(address indexed user, uint256 amount);
     event RewardsClaimed(address indexed user, uint256 quote, uint256 token);
@@ -86,8 +96,6 @@ contract CreatorVault is ReentrancyGuard {
     uint256 public teamOwedToken;
     uint256 public stakerReservedQuote;
     uint256 public stakerReservedToken;
-    uint256 public queuedQuote;
-    uint256 public queuedToken;
     uint256 public rewardPerTokenQuote;
     uint256 public rewardPerTokenToken;
     mapping(address => uint256) internal _paidQuote;
@@ -120,25 +128,29 @@ contract CreatorVault is ReentrancyGuard {
     }
 
     /// @notice Completes the creator-role handoff the round started. Enrolls the HyperCore
-    /// listing set-aside afterwards: accepting the role resets Ascend's listing election.
+    /// listing set-aside afterwards (accepting the role resets Ascend's listing election); a
+    /// listing the desk refuses is reported and never blocks the launch.
     function acceptRole() external {
         if (msg.sender != round) revert OnlyRound();
         launchpad.acceptCreator(poolId);
         if (listingCap > 0) {
-            IListingDesk(launchpad.listingDesk()).enroll(token, quote, listingCap);
-            emit ListingEnrolled(listingCap);
+            try IListingDesk(launchpad.listingDesk()).enroll(token, quote, listingCap) {
+                emit ListingEnrolled(listingCap);
+            } catch {
+                emit ListingRefused(listingCap);
+            }
         }
     }
 
     // ---------------------------------------------------------------- fee routing
 
-    /// @notice Pulls accrued fees from Ascend and routes them. Each leg is claimed separately so a
-    /// quote that refuses transfers cannot strand the token side.
+    /// @notice Pulls accrued fees from Ascend and routes them.
     function harvest() external nonReentrant {
         _pull();
         _checkpoint();
     }
 
+    /// @dev Each leg is claimed separately so a quote that refuses transfers cannot strand the token side.
     function _pull() internal {
         try launchpad.collect(poolId) {} catch {}
         try launchpad.claimToken(poolId) {} catch {}
@@ -151,21 +163,23 @@ contract CreatorVault is ReentrancyGuard {
     }
 
     function _checkpoint() internal {
-        uint256 quoteIncome = _excess(quote, teamOwedQuote + stakerReservedQuote + queuedQuote);
-        uint256 tokenIncome = _excess(token, totalStaked + teamOwedToken + stakerReservedToken + queuedToken);
+        uint256 quoteIncome = _excess(quote, teamOwedQuote + stakerReservedQuote);
+        if (quoteIncome > MAX_QUOTE_INCOME) quoteIncome = MAX_QUOTE_INCOME;
+        uint256 tokenIncome = _excess(token, totalStaked + teamOwedToken + stakerReservedToken);
         if (quoteIncome == 0 && tokenIncome == 0) return;
         Policy memory p = policy;
+        bool stakers = totalStaked > 0;
 
         if (quoteIncome > 0) {
             uint256 platformQ = quoteIncome * p.platformBps / 10_000;
             uint256 bidQ = quoteIncome * p.bidBps / 10_000;
             uint256 stakersQ = quoteIncome * p.stakersBps / 10_000;
             teamOwedQuote += quoteIncome - platformQ - bidQ - stakersQ;
-            _toStakersQuote(stakersQ);
-            if (platformQ > 0) {
-                quote.safeApprove(staking, platformQ);
-                IStakingNotify(staking).notify(quote, platformQ);
-            }
+            // With nobody staked, the stakers' share becomes buy support rather than a prize
+            // for whoever stakes first.
+            if (stakers) _toStakersQuote(stakersQ);
+            else bidQ += stakersQ;
+            _deposit(quote, platformQ);
             if (bidQ > 0) {
                 quote.safeApprove(address(launchpad), bidQ);
                 launchpad.fundBid(poolId, bidQ);
@@ -174,35 +188,33 @@ contract CreatorVault is ReentrancyGuard {
         if (tokenIncome > 0) {
             uint256 platformT = tokenIncome * p.platformBps / 10_000;
             uint256 teamT = tokenIncome * p.teamBps / 10_000;
-            // The bid only buys with quote, so the bid share of token fees goes to stakers.
+            // The bid only buys with quote, so the bid share of token fees goes to stakers, or to
+            // the platform basket when nobody is staked.
+            uint256 stakersT = tokenIncome - platformT - teamT;
             teamOwedToken += teamT;
-            _toStakersToken(tokenIncome - platformT - teamT);
-            if (platformT > 0) {
-                token.safeApprove(staking, platformT);
-                IStakingNotify(staking).notify(token, platformT);
-            }
+            if (stakers) _toStakersToken(stakersT);
+            else platformT += stakersT;
+            _deposit(token, platformT);
         }
         emit Routed(quoteIncome, tokenIncome);
     }
 
+    function _deposit(address asset, uint256 amount) internal {
+        if (amount == 0) return;
+        asset.safeApprove(staking, amount);
+        IStakingDepositor(staking).deposit(asset, amount);
+    }
+
     function _toStakersQuote(uint256 amount) internal {
         if (amount == 0) return;
-        if (totalStaked == 0) {
-            queuedQuote += amount;
-        } else {
-            rewardPerTokenQuote += amount * SCALE / totalStaked;
-            stakerReservedQuote += amount;
-        }
+        rewardPerTokenQuote += FPM.fullMulDiv(amount, SCALE, totalStaked);
+        stakerReservedQuote += amount;
     }
 
     function _toStakersToken(uint256 amount) internal {
         if (amount == 0) return;
-        if (totalStaked == 0) {
-            queuedToken += amount;
-        } else {
-            rewardPerTokenToken += amount * SCALE / totalStaked;
-            stakerReservedToken += amount;
-        }
+        rewardPerTokenToken += FPM.fullMulDiv(amount, SCALE, totalStaked);
+        stakerReservedToken += amount;
     }
 
     function _excess(address asset, uint256 owed) internal view returns (uint256) {
@@ -214,18 +226,19 @@ contract CreatorVault is ReentrancyGuard {
 
     function stake(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
+        _pull();
         _checkpoint();
         _settle(msg.sender);
         token.safeTransferFrom(msg.sender, address(this), amount);
         stakeOf[msg.sender] += amount;
         totalStaked += amount;
-        _releaseQueued();
         emit Staked(msg.sender, amount);
     }
 
     function unstake(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         if (amount > stakeOf[msg.sender]) revert OverStaked();
+        _pull();
         _checkpoint();
         _settle(msg.sender);
         stakeOf[msg.sender] -= amount;
@@ -250,23 +263,14 @@ contract CreatorVault is ReentrancyGuard {
 
     function earned(address user) public view returns (uint256 quoteAmount, uint256 tokenAmount) {
         uint256 s = stakeOf[user];
-        quoteAmount = _owedQuote[user] + s * (rewardPerTokenQuote - _paidQuote[user]) / SCALE;
-        tokenAmount = _owedToken[user] + s * (rewardPerTokenToken - _paidToken[user]) / SCALE;
+        quoteAmount = _owedQuote[user] + FPM.fullMulDiv(s, rewardPerTokenQuote - _paidQuote[user], SCALE);
+        tokenAmount = _owedToken[user] + FPM.fullMulDiv(s, rewardPerTokenToken - _paidToken[user], SCALE);
     }
 
     function _settle(address user) internal {
         (_owedQuote[user], _owedToken[user]) = earned(user);
         _paidQuote[user] = rewardPerTokenQuote;
         _paidToken[user] = rewardPerTokenToken;
-    }
-
-    function _releaseQueued() internal {
-        uint256 q = queuedQuote;
-        uint256 t = queuedToken;
-        queuedQuote = 0;
-        queuedToken = 0;
-        _toStakersQuote(q);
-        _toStakersToken(t);
     }
 
     // ---------------------------------------------------------------- team
@@ -303,6 +307,7 @@ contract CreatorVault is ReentrancyGuard {
     function executePolicy() external nonReentrant {
         if (_policyEta == 0) revert NothingQueued();
         if (block.timestamp < _policyEta) revert TooEarly();
+        if (gasleft() < PULL_GAS_FLOOR) revert InsufficientGas();
         // Fees that accrued under the old split are routed under the old split.
         _pull();
         _checkpoint();
@@ -345,12 +350,22 @@ contract CreatorVault is ReentrancyGuard {
         emit ExitQueued(to, exitEta);
     }
 
+    function cancelExit() external onlyCreator {
+        if (exitEta == 0) revert NothingQueued();
+        exitEta = 0;
+        pendingExit = address(0);
+        emit ExitCancelled();
+    }
+
     /// @notice Offers Ascend's creator role to the queued address once the timelock has passed.
-    /// Balances already owed to the team and to stakers stay claimable here.
+    /// Everything the vault earned while it held the role (pending fees and any listing set-aside)
+    /// is pulled back and routed first; balances owed to the team and to stakers stay claimable here.
     function executeExit() external nonReentrant {
         if (exitEta == 0) revert NothingQueued();
         if (block.timestamp < exitEta) revert TooEarly();
+        if (gasleft() < PULL_GAS_FLOOR) revert InsufficientGas();
         _pull();
+        _reclaimListing();
         _checkpoint();
         address to = pendingExit;
         exitEta = 0;
@@ -359,12 +374,33 @@ contract CreatorVault is ReentrancyGuard {
         emit Exited(to);
     }
 
+    /// @dev Stops the set-aside and withdraws what is not locked for a delivery, to this vault.
+    function _reclaimListing() internal {
+        IListingDesk desk = IListingDesk(launchpad.listingDesk());
+        if (launchpad.listingElection(poolId) != 0) {
+            try desk.close(poolId) {} catch {}
+        }
+        uint256 owed = launchpad.listingOwed(poolId);
+        uint256 locked = desk.pool(poolId).locked;
+        if (owed > locked) {
+            try desk.withdraw(poolId, owed - locked) {} catch {}
+        }
+    }
+
     function queueListing(uint256 cap) external onlyCreator {
         if (listingEta != 0) revert AlreadyQueued();
         if (cap == 0) revert ZeroAmount();
+        if (cap > type(uint88).max) revert OutOfBounds();
         pendingListingCap = cap;
         listingEta = uint40(block.timestamp + _bounds.timelock);
         emit ListingQueued(cap, listingEta);
+    }
+
+    function cancelListing() external onlyCreator {
+        if (listingEta == 0) revert NothingQueued();
+        listingEta = 0;
+        pendingListingCap = 0;
+        emit ListingCancelled();
     }
 
     function executeListing() external {
@@ -380,13 +416,5 @@ contract CreatorVault is ReentrancyGuard {
     /// @notice Stops the listing set-aside; anything returned by the desk is routed as income.
     function closeListing() external onlyCreator {
         IListingDesk(launchpad.listingDesk()).close(poolId);
-    }
-
-    // ---------------------------------------------------------------- EIP-1271
-
-    /// @notice Lets the creator's key sign on behalf of the creator role (token art and metadata
-    /// claims are authorised by whoever holds the role).
-    function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
-        return ECDSA.tryRecoverCalldata(hash, signature) == creator ? ERC1271_MAGIC : bytes4(0xffffffff);
     }
 }

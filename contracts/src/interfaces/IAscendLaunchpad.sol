@@ -61,4 +61,6 @@ interface IAscendLaunchpad {
     function emaSqrtPrice(bytes32 poolId) external view returns (uint160);
     function bidInventory(bytes32 poolId) external view returns (uint256);
     function currentFee(bytes32 poolId) external view returns (uint24);
+    function listingElection(bytes32 poolId) external view returns (uint256);
+    function listingOwed(bytes32 poolId) external view returns (uint256);
 }

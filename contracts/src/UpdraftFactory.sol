@@ -19,6 +19,8 @@ contract UpdraftFactory is Ownable {
     uint16 public constant MAX_TEAM_BPS = 6000;
     uint32 public constant MIN_POLICY_TIMELOCK = 5 minutes;
     uint32 public constant MAX_PARTICIPANT_VESTING = 30 days;
+    /// @dev Commits can only be held this long past the close before anyone may abort for refunds.
+    uint32 public constant MAX_FIRE_WINDOW = 7 days;
 
     struct LaunchpadInfo {
         bool allowed;
@@ -38,6 +40,8 @@ contract UpdraftFactory is Ownable {
     error UnknownAttestor();
     error BadParams();
     error BadToken();
+    error ZeroCreator();
+    error BadListingCap();
 
     event LaunchpadAllowed(address indexed launchpad, address ascendOwner);
     event LaunchpadRevoked(address indexed launchpad);
@@ -125,6 +129,9 @@ contract UpdraftFactory is Ownable {
         if (lp.owner() != info.ascendOwner) revert LaunchpadOwnerMismatch();
         if (!lp.quoteConfig(cfg.quote).allowed) revert QuoteNotAllowed();
         if (bytes(cfg.name).length == 0 || bytes(cfg.symbol).length == 0) revert BadToken();
+        if (cfg.creator == address(0)) revert ZeroCreator();
+        // Ascend's listing desk refuses caps above uint88; such a round could never fire.
+        if (cfg.listingCap > type(uint88).max) revert BadListingCap();
         _checkWindows(cfg);
         _checkVesting(cfg.participantVesting, cfg.creatorVesting);
         _checkPolicy(cfg.policy, cfg.bounds);
@@ -151,12 +158,16 @@ contract UpdraftFactory is Ownable {
     function _checkWindows(RoundConfig calldata cfg) internal view {
         if (
             !(cfg.windows.openAt < cfg.windows.lockAt && cfg.windows.lockAt <= cfg.windows.closeAt
-                    && cfg.windows.closeAt < cfg.windows.fireBy && cfg.windows.closeAt > block.timestamp)
+                    && cfg.windows.closeAt < cfg.windows.fireBy && cfg.windows.closeAt > block.timestamp
+                    && cfg.windows.fireBy - cfg.windows.closeAt <= MAX_FIRE_WINDOW)
         ) revert BadWindows();
     }
 
     function _checkRaise(RoundConfig calldata cfg, IAscendLaunchpad lp, bool tokenIs0) internal view {
-        if (cfg.raise.minRaise == 0 || cfg.raise.minRaise > cfg.raise.maxRaise || cfg.raise.walletCap == 0) {
+        if (
+            cfg.raise.minRaise == 0 || cfg.raise.minRaise > cfg.raise.maxRaise || cfg.raise.walletCap == 0
+                || cfg.raise.minCommit == 0 || cfg.raise.minCommit > cfg.raise.walletCap
+        ) {
             revert BadRaise();
         }
         if (cfg.raise.maxRaise > CurveLens.capacity(lp, cfg.quote, tokenIs0)) revert MaxRaiseOverCapacity();
@@ -164,7 +175,9 @@ contract UpdraftFactory is Ownable {
 
     /// @dev The creator never unlocks anything at T0 and stays locked at least as long as anyone else.
     function _checkVesting(Vesting calldata participant, Vesting calldata creator) internal pure {
-        if (participant.tgeBps > 10_000 || participant.duration > MAX_PARTICIPANT_VESTING) revert BadVesting();
+        if (participant.tgeBps > 10_000 || uint256(participant.cliff) + participant.duration > MAX_PARTICIPANT_VESTING) {
+            revert BadVesting();
+        }
         if (participant.tgeBps < 10_000 && participant.duration == 0) revert BadVesting();
         if (creator.tgeBps != 0 || creator.duration == 0 || creator.cliff < participant.cliff + participant.duration) {
             revert WeakCreatorVesting();

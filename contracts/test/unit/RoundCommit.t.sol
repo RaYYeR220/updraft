@@ -49,10 +49,10 @@ contract RoundCommitTest is RoundTestBase {
         UpdraftRound round = _newRound();
         _commit(round, creator, 2_000e6);
         assertTrue(round.isCreatorCommit(creator));
-        _fund(creator, 1, round);
+        _fund(creator, 1e6, round);
         vm.prank(creator);
         vm.expectRevert(UpdraftRound.OverCreatorCap.selector);
-        round.commit(1, _noVoucher(), "");
+        round.commit(1e6, _noVoucher(), "");
     }
 
     function test_withdraw_afterLock_reverts() public {

@@ -21,7 +21,8 @@ enum AbortReason {
     LaunchpadPaused,
     QuoteDisallowed,
     CurveChanged,
-    LaunchpadRevoked
+    LaunchpadRevoked,
+    LaunchFailed
 }
 
 /// @dev openAt < lockAt <= closeAt < fireBy. Withdrawals stop at lockAt, commits at closeAt.
@@ -38,6 +39,8 @@ struct Raise {
     uint128 maxRaise;
     uint128 walletCap;
     uint128 creatorCap;
+    /// @dev Smallest commit and smallest balance a wallet may leave behind (0 or at least this).
+    uint128 minCommit;
 }
 
 /// @dev tgeBps unlocks at fire; the rest unlocks linearly over `duration` after `cliff`.

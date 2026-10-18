@@ -42,6 +42,8 @@ contract FakeAscendLaunchpad {
     mapping(bytes32 => uint256) public creatorOwedQuote;
     mapping(bytes32 => uint256) public bidInventory;
     bool public quoteClaimReverts;
+    bool public launchReverts;
+    mapping(bytes32 => uint256) public listingOwed;
 
     event Launched(
         bytes32 indexed poolId,
@@ -84,9 +86,29 @@ contract FakeAscendLaunchpad {
         owner = o;
     }
 
+    function setLaunchReverts(bool v) external {
+        launchReverts = v;
+    }
+
+    /// @dev Models Ascend's listing set-aside: funds the desk can pay to the creator role.
+    function setListingOwed(bytes32 poolId, uint256 amount) external {
+        listingOwed[poolId] = amount;
+    }
+
+    function takeListing(bytes32 poolId, address to, uint256 amount) external {
+        require(msg.sender == address(desk), "desk only");
+        listingOwed[poolId] -= amount;
+        IERC20Min(pools[poolId].quote).transfer(to, amount);
+    }
+
+    function listingElection(bytes32 poolId) external view returns (uint256) {
+        return desk.enrolledCapOf(poolId);
+    }
+
     // ------------------------------------------------------------ launch
     function launch(IAscendLaunchpad.LaunchParams calldata p) external returns (address token, bytes32 poolId) {
         if (paused) revert LaunchesArePaused();
+        require(!launchReverts, "launch reverts");
         if (p.creator == address(0)) revert ZeroCreator();
         IAscendLaunchpad.QuoteConfig memory qc = _quote[p.quote];
         if (!qc.allowed) revert QuoteNotAllowed();
@@ -206,10 +228,22 @@ contract FakeAscendLaunchpad {
     }
 }
 
-/// @notice Records listing enrollments the way Ascend's desk gates them: creator role only.
+/// @notice Records listing enrollments the way Ascend's desk gates them: creator role only,
+/// cap within uint88; closing stops the election and lets the role withdraw the set-aside.
 contract FakeListingDesk {
+    struct Pool {
+        address token;
+        uint40 committedUntil;
+        uint40 listedAt;
+        uint32 coreIndex;
+        uint32 spotIndex;
+        uint256 locked;
+    }
+
     FakeAscendLaunchpad public immutable launchpad;
     mapping(address => uint256) public enrolledCap;
+    mapping(bytes32 => uint256) public enrolledCapOf;
+    bool public refuseAll;
 
     error Refused();
 
@@ -217,11 +251,30 @@ contract FakeListingDesk {
         launchpad = lp;
     }
 
-    function enroll(address token, address quote, uint256 cap) external {
-        bytes32 poolId = keccak256(abi.encode(token, quote));
-        if (msg.sender != launchpad.poolCreator(poolId) || cap == 0) revert Refused();
-        enrolledCap[token] = cap;
+    function setRefuseAll(bool v) external {
+        refuseAll = v;
     }
 
-    function close(bytes32) external {}
+    function enroll(address token, address quote, uint256 cap) external {
+        bytes32 poolId = keccak256(abi.encode(token, quote));
+        if (refuseAll || msg.sender != launchpad.poolCreator(poolId) || cap == 0 || cap > type(uint88).max) {
+            revert Refused();
+        }
+        enrolledCap[token] = cap;
+        enrolledCapOf[poolId] = cap;
+    }
+
+    function close(bytes32 poolId) external {
+        if (enrolledCapOf[poolId] == 0 || msg.sender != launchpad.poolCreator(poolId)) revert Refused();
+        enrolledCapOf[poolId] = 0;
+    }
+
+    function withdraw(bytes32 poolId, uint256 amount) external {
+        if (enrolledCapOf[poolId] != 0 || amount == 0 || amount > launchpad.listingOwed(poolId)) revert Refused();
+        launchpad.takeListing(poolId, launchpad.poolCreator(poolId), amount);
+    }
+
+    function pool(bytes32) external pure returns (Pool memory p) {
+        return p;
+    }
 }

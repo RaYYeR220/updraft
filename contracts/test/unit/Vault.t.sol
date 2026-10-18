@@ -135,14 +135,6 @@ contract VaultTest is Test {
         assertEq(usdc.balanceOf(bob), 90e6);
     }
 
-    function test_rewardsBeforeAnyStake_goToFirstStakers() public {
-        _accrue(0, 1_000e6);
-        vault.harvest();
-        _stake(alice, 10e18);
-        (uint256 q,) = vault.earned(alice);
-        assertEq(q, 300e6, "queued staker leg released to the first staker");
-    }
-
     function test_claimQuoteReverting_tokenLegStillHarvested() public {
         _accrue(100e18, 100e6);
         lp.setQuoteClaimReverts(true);
@@ -303,11 +295,4 @@ contract VaultTest is Test {
         assertEq(lp.desk().enrolledCap(tok), 500e6, "listing set-aside enrolled by the vault as creator");
     }
 
-    function test_1271_validForCreatorSig_invalidOtherwise() public view {
-        bytes32 hash = keccak256("art claim");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creatorKey, hash);
-        assertEq(vault.isValidSignature(hash, abi.encodePacked(r, s, v)), bytes4(0x1626ba7e));
-        (v, r, s) = vm.sign(0xBEEF, hash);
-        assertEq(vault.isValidSignature(hash, abi.encodePacked(r, s, v)), bytes4(0xffffffff));
-    }
 }

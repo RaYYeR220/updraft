@@ -54,7 +54,7 @@ contract RoundFireForkTest is ForkBase {
         cfg.creator = creator;
         cfg.mode = Mode.Open;
         cfg.windows = Windows({openAt: t, lockAt: t + 50 minutes, closeAt: t + 1 hours, fireBy: t + 2 hours});
-        cfg.raise = Raise({minRaise: 100e6, maxRaise: 50_000e6, walletCap: 5_000e6, creatorCap: 2_000e6});
+        cfg.raise = Raise({minRaise: 100e6, maxRaise: 50_000e6, walletCap: 5_000e6, creatorCap: 2_000e6, minCommit: 1e6});
         cfg.participantVesting = Vesting({tgeBps: 10_000, cliff: 0, duration: 0});
         cfg.creatorVesting = Vesting({tgeBps: 0, cliff: 1 days, duration: 7 days});
         cfg.policy = Policy({platformBps: 1000, bidBps: 3000, stakersBps: 3000, teamBps: 3000});

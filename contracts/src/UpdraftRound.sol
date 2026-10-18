@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+import {FixedPointMathLib as FPM} from "solady/utils/FixedPointMathLib.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
@@ -16,10 +17,11 @@ import {LaunchCertificate, Certificate} from "./LaunchCertificate.sol";
 
 interface IFactoryView {
     function isAllowedLaunchpad(address launchpad) external view returns (bool);
+    function isAttestor(address attestor) external view returns (bool);
 }
 
-interface IStakingNotifier {
-    function notify(address asset, uint256 amount) external;
+interface IStakingDeposit {
+    function deposit(address asset, uint256 amount) external;
 }
 
 interface IERC20Permit {
@@ -31,7 +33,8 @@ interface IERC20Permit {
 /// becomes a single atomic dev-buy through Ascend's launch(), so every participant pays the same
 /// price. Until then the round is an escrow: funds leave only as withdrawals, refunds or the launch.
 /// @dev Every payout is computed against the real quote balance, never against bookkeeping alone:
-/// the quote can lose balance outside our control (Ascend's testnet stables have a public burn).
+/// the quote can gain or lose balance outside our control (Ascend's testnet stables have a public
+/// mint and burn), so products of balances use full-precision mulDiv and payouts cap at what is held.
 contract UpdraftRound is ReentrancyGuard, EIP712 {
     using SafeTransferLib for address;
 
@@ -44,6 +47,8 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     error Closed();
     error Locked();
     error ZeroAmount();
+    error BelowMinCommit();
+    error EscrowShort();
     error OverWalletCap();
     error OverCreatorCap();
     error OverCommitted();
@@ -60,6 +65,7 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     error NotFired();
     error NothingToClaim();
     error TokenMismatch();
+    error LaunchpadPaused();
 
     event Committed(
         address indexed wallet, bytes32 indexed identityId, uint256 amount, uint256 walletTotal, uint256 roundTotal
@@ -84,11 +90,10 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     Status public status;
     AbortReason public abortReason;
     uint256 public totalCommitted;
-    uint256 public balanceAtAbort;
     mapping(address => uint256) public commitOf;
-    mapping(address => bool) public refunded;
     address[] internal _participants;
-    mapping(address => bool) internal _joined;
+    /// @dev 1-based position in _participants; 0 when the wallet holds no commit.
+    mapping(address => uint256) internal _slot;
 
     /// @notice Verified mode: one identity per wallet and one wallet per identity, per round.
     mapping(address => bytes32) public identityOf;
@@ -108,8 +113,12 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     uint256 public refundPool;
     uint256 public distributedCount;
     mapping(address => uint256) public claimedTokens;
-    mapping(address => bool) public quoteRefunded;
+    mapping(address => uint256) public refundPaid;
     mapping(address => bool) public pushed;
+
+    // Set at abort.
+    uint256 public remainingCommitted;
+    mapping(address => bool) public refunded;
 
     constructor() {
         // The implementation itself can never be initialized; clones start empty.
@@ -158,6 +167,9 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         if (block.timestamp < _cfg.windows.openAt) revert NotOpen();
         if (block.timestamp >= _cfg.windows.closeAt) revert Closed();
         if (amount == 0) revert ZeroAmount();
+        if (amount < _cfg.raise.minCommit) revert BelowMinCommit();
+        // A short escrow would shift its loss onto new money; wait until it is made whole.
+        if (_quoteBalance() < totalCommitted) revert EscrowShort();
 
         bytes32 identityId = _checkIdentity(voucher, signature);
         uint256 walletTotal = commitOf[msg.sender] + amount;
@@ -166,10 +178,10 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         } else if (walletTotal > _cfg.raise.walletCap) {
             revert OverWalletCap();
         }
-        if (!_joined[msg.sender]) {
+        if (_slot[msg.sender] == 0) {
             if (_participants.length >= MAX_PARTICIPANTS) revert TooManyParticipants();
-            _joined[msg.sender] = true;
             _participants.push(msg.sender);
+            _slot[msg.sender] = _participants.length;
         }
 
         commitOf[msg.sender] = walletTotal;
@@ -178,8 +190,8 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         emit Committed(msg.sender, identityId, amount, walletTotal, totalCommitted);
     }
 
-    /// @dev Open mode needs no identity. Verified mode needs one attestor voucher per wallet, once:
-    /// later top-ups by the same wallet reuse the identity it was admitted with.
+    /// @dev Open mode needs no identity. Verified mode needs one voucher per wallet, once, from an
+    /// attestor the factory still allows: later top-ups reuse the identity it was admitted with.
     function _checkIdentity(Voucher calldata v, bytes calldata signature) internal returns (bytes32) {
         if (_cfg.mode == Mode.Open) return bytes32(0);
         bytes32 known = identityOf[msg.sender];
@@ -191,7 +203,10 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         bytes32 structHash =
             keccak256(abi.encode(VOUCHER_TYPEHASH, v.round, v.wallet, v.identityId, v.expiry, v.evidenceHash));
         address signer = ECDSA.tryRecoverCalldata(_hashTypedData(structHash), signature);
-        if (signer == address(0) || signer != _cfg.attestor || v.identityId == bytes32(0)) revert BadVoucher();
+        if (
+            signer == address(0) || signer != _cfg.attestor || v.identityId == bytes32(0)
+                || !IFactoryView(factory).isAttestor(signer)
+        ) revert BadVoucher();
         if (walletOfIdentity[v.identityId] != address(0)) revert IdentityTaken();
 
         identityOf[msg.sender] = v.identityId;
@@ -201,23 +216,37 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         return v.identityId;
     }
 
-    /// @notice Take quote back out before the lock. If the escrow has lost balance, the
-    /// withdrawal carries its pro-rata share of the loss, so everyone else's backing is unchanged.
+    /// @notice Take quote back out before the lock. If the escrow has lost balance, the withdrawal
+    /// carries its pro-rata share of the loss, so everyone else's backing is unchanged. A wallet
+    /// that withdraws everything gives its participant slot back.
     function withdraw(uint256 amount) external nonReentrant {
         if (status != Status.Live) revert NotLive();
         if (block.timestamp >= _cfg.windows.lockAt) revert Locked();
         if (amount == 0) revert ZeroAmount();
         uint256 committed = commitOf[msg.sender];
         if (amount > committed) revert OverCommitted();
+        uint256 left = committed - amount;
+        if (left != 0 && left < _cfg.raise.minCommit) revert BelowMinCommit();
 
         uint256 total = totalCommitted;
         uint256 balance = _quoteBalance();
-        uint256 paid = balance < total ? amount * balance / total : amount;
+        uint256 paid = balance < total ? FPM.fullMulDiv(amount, balance, total) : amount;
 
-        commitOf[msg.sender] = committed - amount;
+        commitOf[msg.sender] = left;
         totalCommitted = total - amount;
+        if (left == 0) _release(msg.sender);
         _cfg.quote.safeTransfer(msg.sender, paid);
         emit Withdrawn(msg.sender, amount, paid, totalCommitted);
+    }
+
+    /// @dev Swap-and-pop; only ever runs while the round is live, before any index is used.
+    function _release(address wallet) internal {
+        uint256 i = _slot[wallet] - 1;
+        address last = _participants[_participants.length - 1];
+        _participants[i] = last;
+        _slot[last] = i + 1;
+        _participants.pop();
+        delete _slot[wallet];
     }
 
     // ---------------------------------------------------------------- fire
@@ -237,8 +266,9 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     }
 
     /// @notice Launches the token: the whole batch becomes Ascend's atomic dev-buy, so every
-    /// participant pays the same price. Anyone may call it once commits close. If Ascend's side
-    /// changed in a way the participants did not sign up for, the round aborts and refunds instead.
+    /// participant pays the same price. Anyone may call it once commits close. While Ascend is
+    /// paused it waits; if Ascend changed in a way participants did not sign up for, or the launch
+    /// itself fails, the round aborts and refunds instead of holding funds until the deadline.
     function fire() external nonReentrant {
         if (status != Status.Live) revert NotLive();
         if (block.timestamp < _cfg.windows.closeAt) revert NotClosed();
@@ -249,12 +279,14 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         uint256 usable = balance < total ? balance : total;
         if (usable < _cfg.raise.minRaise) return _abort(AbortReason.BelowMinimum);
         AbortReason reason = _preflight();
+        if (reason == AbortReason.LaunchpadPaused) revert LaunchpadPaused();
         if (reason != AbortReason.None) return _abort(reason);
-        if (usable < total) emit Shortfall(total, balance);
 
         uint256 effective = usable < _cfg.raise.maxRaise ? usable : _cfg.raise.maxRaise;
         uint256 parity = effective * _params.parityBps / 10_000;
-        uint256 spent = _launch(effective - parity, balance);
+        (bool launched, uint256 spent) = _launch(effective - parity, balance);
+        if (!launched) return _abort(AbortReason.LaunchFailed);
+        if (usable < total) emit Shortfall(total, balance);
 
         IAscendLaunchpad lp = IAscendLaunchpad(_cfg.launchpad);
         if (parity > 0) {
@@ -267,7 +299,7 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         uint256 platformTokens = out * _params.platformTokenBps / 10_000;
         if (platformTokens > 0) {
             token.safeApprove(_wiring.staking, platformTokens);
-            IStakingNotifier(_wiring.staking).notify(token, platformTokens);
+            IStakingDeposit(_wiring.staking).deposit(token, platformTokens);
         }
 
         status = Status.Fired;
@@ -290,12 +322,13 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         return AbortReason.None;
     }
 
-    /// @dev The dev-buy. The round is the creator at launch, so the tokens land here.
-    function _launch(uint256 devBuy, uint256 balanceBefore) internal returns (uint256 spent) {
+    /// @dev The dev-buy. The round is the creator at launch, so the tokens land here. A launch that
+    /// reverts for any reason reports failure instead of reverting fire().
+    function _launch(uint256 devBuy, uint256 balanceBefore) internal returns (bool ok, uint256 spent) {
         IAscendLaunchpad lp = IAscendLaunchpad(_cfg.launchpad);
         (uint256 expectedOut,) = CurveLens.preview(lp, _cfg.quote, expectedToken < _cfg.quote, devBuy);
         _cfg.quote.safeApprove(address(lp), devBuy);
-        (address launched, bytes32 pid) = lp.launch(
+        try lp.launch(
             IAscendLaunchpad.LaunchParams({
                 name: _cfg.name,
                 symbol: _cfg.symbol,
@@ -305,11 +338,15 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
                 salt: _cfg.tokenSalt,
                 creator: address(this)
             })
-        );
-        if (launched != expectedToken) revert TokenMismatch();
-        token = launched;
-        poolId = pid;
-        spent = balanceBefore - _quoteBalance();
+        ) returns (address launched, bytes32 pid) {
+            if (launched != expectedToken) revert TokenMismatch();
+            token = launched;
+            poolId = pid;
+            spent = balanceBefore - _quoteBalance();
+            ok = true;
+        } catch {
+            _cfg.quote.safeApprove(address(lp), 0);
+        }
     }
 
     /// @dev Hands Ascend's creator role to a fresh policy vault in the same transaction.
@@ -352,10 +389,10 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
                 verifiedIdentities: verifiedCount,
                 top1Bps: top1,
                 top10Bps: top10,
-                creatorTokens: netTokens * commitOf[_cfg.creator] / totalCommitted,
+                creatorTokens: FPM.fullMulDiv(netTokens, commitOf[_cfg.creator], totalCommitted),
                 creatorVesting: _cfg.creatorVesting,
                 participantVesting: _cfg.participantVesting,
-                policyHash: keccak256(abi.encode(_cfg.policy, _cfg.bounds)),
+                policyHash: keccak256(abi.encode(_cfg.policy, _cfg.bounds, _cfg.exitEnabled, _cfg.listingCap)),
                 attestor: _cfg.mode == Mode.Verified ? _cfg.attestor : address(0),
                 evidenceAccumulator: evidenceAccumulator,
                 shortfall: shortfall
@@ -407,29 +444,33 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
 
     function claim() external nonReentrant {
         (uint256 tokens, uint256 refund) = claimable(msg.sender);
-        if (tokens == 0 && refund == 0) revert NothingToClaim();
+        if (tokens == 0 && (refund == 0 || _quoteBalance() == 0)) revert NothingToClaim();
         _payout(msg.sender);
     }
 
+    /// @notice Tokens vested and not yet paid, and the quote refund still owed (paid as far as the
+    /// round's balance allows; the two never block each other).
     function claimable(address wallet) public view returns (uint256 tokens, uint256 refund) {
         if (status != Status.Fired) return (0, 0);
         uint256 c = commitOf[wallet];
         if (c == 0) return (0, 0);
-        uint256 share = netTokens * c / totalCommitted;
+        uint256 share = FPM.fullMulDiv(netTokens, c, totalCommitted);
         Vesting memory v = wallet == _cfg.creator ? _cfg.creatorVesting : _cfg.participantVesting;
         tokens = _vested(share, v) - claimedTokens[wallet];
-        refund = quoteRefunded[wallet] ? 0 : refundPool * c / totalCommitted;
+        refund = FPM.fullMulDiv(refundPool, c, totalCommitted) - refundPaid[wallet];
     }
 
     function _payout(address wallet) internal {
-        (uint256 tokens, uint256 refund) = claimable(wallet);
+        (uint256 tokens, uint256 owed) = claimable(wallet);
         if (tokens > 0) {
             claimedTokens[wallet] += tokens;
             token.safeTransfer(wallet, tokens);
         }
-        if (!quoteRefunded[wallet]) {
-            quoteRefunded[wallet] = true;
-            if (refund > 0) _cfg.quote.safeTransfer(wallet, refund);
+        uint256 balance = _quoteBalance();
+        uint256 refund = owed < balance ? owed : balance;
+        if (refund > 0) {
+            refundPaid[wallet] += refund;
+            _cfg.quote.safeTransfer(wallet, refund);
         }
         emit Claimed(wallet, tokens, refund);
     }
@@ -440,7 +481,7 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         if (elapsed < v.cliff) return atTge;
         uint256 sinceCliff = elapsed - v.cliff;
         if (v.duration == 0 || sinceCliff >= v.duration) return share;
-        return atTge + (share - atTge) * sinceCliff / v.duration;
+        return atTge + FPM.fullMulDiv(share - atTge, sinceCliff, v.duration);
     }
 
     // ---------------------------------------------------------------- abort and refunds
@@ -460,18 +501,20 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     function _abort(AbortReason reason) internal {
         status = Status.Aborted;
         abortReason = reason;
-        balanceAtAbort = _quoteBalance();
-        emit Aborted(reason, balanceAtAbort);
+        remainingCommitted = totalCommitted;
+        emit Aborted(reason, _quoteBalance());
     }
 
-    /// @notice After an abort, each participant takes their pro-rata share of what the escrow holds.
+    /// @notice After an abort, each participant takes their pro-rata share of what the escrow holds
+    /// now, measured against the commitments not yet refunded, so any later gain or loss is shared.
     function refundAborted() external nonReentrant {
         if (status != Status.Aborted) revert NotAbortable();
         uint256 committed = commitOf[msg.sender];
         if (committed == 0 || refunded[msg.sender]) revert NothingToRefund();
         refunded[msg.sender] = true;
-        uint256 amount = balanceAtAbort * committed / totalCommitted;
-        _cfg.quote.safeTransfer(msg.sender, amount);
+        uint256 amount = FPM.fullMulDiv(_quoteBalance(), committed, remainingCommitted);
+        remainingCommitted -= committed;
+        if (amount > 0) _cfg.quote.safeTransfer(msg.sender, amount);
         emit Refunded(msg.sender, amount);
     }
 
