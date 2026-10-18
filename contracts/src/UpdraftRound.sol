@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+import {EIP712} from "solady/utils/EIP712.sol";
+import {ECDSA} from "solady/utils/ECDSA.sol";
 import {RoundConfig, Params, Wiring, Voucher, Status, AbortReason, Mode} from "./interfaces/IUpdraft.sol";
 
 interface IERC20Permit {
@@ -15,10 +17,12 @@ interface IERC20Permit {
 /// price. Until then the round is an escrow: funds leave only as withdrawals, refunds or the launch.
 /// @dev Every payout is computed against the real quote balance, never against bookkeeping alone:
 /// the quote can lose balance outside our control (Ascend's testnet stables have a public burn).
-contract UpdraftRound is ReentrancyGuard {
+contract UpdraftRound is ReentrancyGuard, EIP712 {
     using SafeTransferLib for address;
 
     uint256 public constant MAX_PARTICIPANTS = 1000;
+    bytes32 public constant VOUCHER_TYPEHASH =
+        keccak256("Voucher(address round,address wallet,bytes32 identityId,uint64 expiry,bytes32 evidenceHash)");
 
     error AlreadyInitialized();
     error NotOpen();
@@ -32,6 +36,11 @@ contract UpdraftRound is ReentrancyGuard {
     error NotLive();
     error NotAbortable();
     error NothingToRefund();
+    error BadVoucher();
+    error VoucherExpired();
+    error IdentityTaken();
+    error WrongRound();
+    error WrongWallet();
 
     event Committed(
         address indexed wallet, bytes32 indexed identityId, uint256 amount, uint256 walletTotal, uint256 roundTotal
@@ -55,6 +64,13 @@ contract UpdraftRound is ReentrancyGuard {
     mapping(address => bool) public refunded;
     address[] internal _participants;
     mapping(address => bool) internal _joined;
+
+    /// @notice Verified mode: one identity per wallet and one wallet per identity, per round.
+    mapping(address => bytes32) public identityOf;
+    mapping(bytes32 => address) public walletOfIdentity;
+    /// @notice Rolling hash of every accepted voucher's evidence hash, in commit order.
+    bytes32 public evidenceAccumulator;
+    uint32 public verifiedCount;
 
     constructor() {
         // The implementation itself can never be initialized; clones start empty.
@@ -123,9 +139,27 @@ contract UpdraftRound is ReentrancyGuard {
         emit Committed(msg.sender, identityId, amount, walletTotal, totalCommitted);
     }
 
-    /// @dev Open mode needs no identity. Verified mode is added on top of this hook.
-    function _checkIdentity(Voucher calldata, bytes calldata) internal virtual returns (bytes32) {
-        return bytes32(0);
+    /// @dev Open mode needs no identity. Verified mode needs one attestor voucher per wallet, once:
+    /// later top-ups by the same wallet reuse the identity it was admitted with.
+    function _checkIdentity(Voucher calldata v, bytes calldata signature) internal returns (bytes32) {
+        if (_cfg.mode == Mode.Open) return bytes32(0);
+        bytes32 known = identityOf[msg.sender];
+        if (known != bytes32(0)) return known;
+
+        if (v.round != address(this)) revert WrongRound();
+        if (v.wallet != msg.sender) revert WrongWallet();
+        if (block.timestamp > v.expiry) revert VoucherExpired();
+        bytes32 structHash =
+            keccak256(abi.encode(VOUCHER_TYPEHASH, v.round, v.wallet, v.identityId, v.expiry, v.evidenceHash));
+        address signer = ECDSA.tryRecoverCalldata(_hashTypedData(structHash), signature);
+        if (signer == address(0) || signer != _cfg.attestor || v.identityId == bytes32(0)) revert BadVoucher();
+        if (walletOfIdentity[v.identityId] != address(0)) revert IdentityTaken();
+
+        identityOf[msg.sender] = v.identityId;
+        walletOfIdentity[v.identityId] = msg.sender;
+        evidenceAccumulator = keccak256(abi.encode(evidenceAccumulator, v.evidenceHash));
+        verifiedCount++;
+        return v.identityId;
     }
 
     /// @notice Take quote back out before the lock. If the escrow has lost balance, the
@@ -207,6 +241,10 @@ contract UpdraftRound is ReentrancyGuard {
 
     function participantCount() external view returns (uint256) {
         return _participants.length;
+    }
+
+    function _domainNameAndVersion() internal pure override returns (string memory, string memory) {
+        return ("Updraft Attestor", "1");
     }
 
     function _quoteBalance() internal view returns (uint256) {
