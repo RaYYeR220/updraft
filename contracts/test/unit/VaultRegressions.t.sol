@@ -16,7 +16,8 @@ interface IERC20VR {
     function transfer(address, uint256) external returns (bool);
 }
 
-/// @notice Regression tests for the vault findings of the self-audit (F03b, F04, F08, F11, F12, I5).
+/// @notice Regression tests for the vault's security findings (F03, F04, F06, F08, F11, F12, F16, F18, I5;
+/// see docs/SECURITY.md).
 contract VaultRegressionsTest is Test {
     FakeAscendLaunchpad internal lp;
     BurnableUsdc internal usdc;
@@ -163,9 +164,9 @@ contract VaultRegressionsTest is Test {
         assertEq(lp.poolCreator(pid), address(v));
     }
 
-    // I1: a stake sent from inside someone else's Infinity lock would skip the fee pull (Ascend's
+    // F18: a stake sent from inside someone else's Infinity lock would skip the fee pull (Ascend's
     // collect needs the lock) and let a just-in-time staker share fees accrued before it staked.
-    function test_I1_pullInsideAForeignLock_reverts() public {
+    function test_F18_pullInsideAForeignLock_reverts() public {
         (CreatorVault v, address token,) = _vault(0, false);
         IERC20VR(token).transfer(alice, 1e18);
         vm.startPrank(alice);
@@ -179,8 +180,8 @@ contract VaultRegressionsTest is Test {
         assertEq(v.stakeOf(alice), 1e18);
     }
 
-    // I1: the same skip by starving collect of gas is refused too.
-    function test_I1_starvedPull_reverts() public {
+    // F18: the same skip by starving collect of gas is refused too.
+    function test_F18_starvedPull_reverts() public {
         (CreatorVault v, address token,) = _vault(0, false);
         IERC20VR(token).transfer(alice, 1e18);
         lp.setCollectGas(2_000_000);
@@ -193,8 +194,8 @@ contract VaultRegressionsTest is Test {
         assertEq(v.stakeOf(alice), 1e18);
     }
 
-    // I1: an exit can't complete while the listing set-aside is still live; the desk's refusal reverts it.
-    function test_I1_exitCannotSkipALiveListing() public {
+    // F18: an exit can't complete while the listing set-aside is still live; the desk's refusal reverts it.
+    function test_F18_exitCannotSkipALiveListing() public {
         (CreatorVault v,, bytes32 pid) = _vault(500e6, true);
         assertGt(lp.listingElection(pid), 0);
         vm.prank(creator);

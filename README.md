@@ -42,9 +42,9 @@ Ascend's launch already does two good things. The dev-buy is atomic and pays no 
    - the raise is below the minimum
    - the fire deadline is missed
    - Ascend's curve or quote setup changed
-   - the launch reverts
+   - the launchpad was retired
 
-   While Ascend is paused, fire waits instead.
+   A failed launch never ends a round. If Ascend is paused, or a launch attempt fails, fire reverts and the round waits for the next attempt.
 
 **Fee parity.** Ascend's launch buy pays no fee, and Updraft doesn't take that for free: 1% of every batch goes to Ascend's own bid.
 

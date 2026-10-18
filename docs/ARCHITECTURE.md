@@ -28,7 +28,7 @@ All contracts are Solidity 0.8.30 and immutable: no proxies, no upgrades. Rounds
 
 - Creates rounds with CREATE2 from `keccak(sender, salt)`. The round's address, and so the token's address, are known at creation.
 - Validates every round against Ascend's live state, so a round that can never fire is rejected at creation:
-  - the launchpad is on the allowlist, Ascend's owner matches, and the token creation code matches
+  - the launchpad is on the allowlist and Ascend's owner matches; the factory predicts the token's address from the token bytecode recorded for that launchpad, and fire checks the prediction
   - the quote is allowed
   - windows are ordered, and the fire window is at most 7 days
   - `maxRaise` is within the curve's capacity, so there are no partial fills
@@ -71,9 +71,9 @@ One identity maps to one wallet per round, and each wallet is held to the round'
    - If any of these fails, the round aborts.
    - If Ascend is paused, `fire()` reverts and the round stays live.
 2. **Amounts.** `usable = min(totalCommitted, balance)`, so a testnet burn is shared pro-rata. `effective = min(usable, maxRaise)`, and `parity = 1%` of it.
-3. **Launch.** `launch({devBuyQuote: effective − parity, minDevOut: lens preview, creator: round})`, with at least 5M gas guaranteed (see F16 in [SECURITY.md](SECURITY.md)).
+3. **Launch.** `launch({devBuyQuote: effective − parity, minDevOut: lens preview, creator: round})`.
    - The lens preview is exact, so `minDevOut` has zero slack.
-   - If the launch reverts, the round aborts.
+   - If the launch reverts, `fire()` reverts and the round stays live for the next attempt. Whoever sends `fire()` controls the context the launch runs in, so a failed launch must never end a round (F16 and F17 in [SECURITY.md](SECURITY.md)). If it never succeeds, the fire-by deadline refunds everyone.
 4. **Fee parity.** `fundBid(poolId, parity)`.
 5. **Vault.** Clone a `CreatorVault` with salt `poolId`. Ascend's `transferCreator` hands it the role, and the vault accepts in the same transaction. If configured, the vault also enrolls the HyperCore listing set-aside.
 6. **Platform cut.** 0.5% of the tokens out go to `UpdraftStaking.deposit`.
@@ -156,7 +156,7 @@ Every decision, approval or refusal, stores its inputs under an evidence hash. I
 Hosting:
 
 - The API, indexer and keeper run on Cloud Run.
-- The API keeps attestations, evidence and epochs in Supabase Postgres.
+- The API keeps attestations, evidence and epochs in Supabase Postgres. It runs as a single instance, so the drip's limits are checked and reserved one request at a time.
 - The indexer uses an embedded database. It rebuilds from the chain whenever it restarts, which takes minutes, because all of its state is derived from events.
 - Secrets are only in the environment.
 

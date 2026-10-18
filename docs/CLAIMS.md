@@ -25,7 +25,7 @@ Every claim Updraft makes, and how far it is proven.
 | 1% of every batch goes to Ascend's own bid ("fee parity") | Live, Tested | Rehearsal `fire` (`BidFunded`); `test_fork_fullRound_onLiveAscend` |
 | Every launch writes a certificate: participants, top-1 / top-10 concentration, creator vesting, policy hash, shortfall | Live, Tested | `GET /certificates/:token`; `test_certificate_recordsTop10AndCounts`, `Certificate.t.sol` (write once, only by its round) |
 | A round that can't launch aborts and refunds pro-rata | Live, Tested | [Refusals](PROOF.md#refusals): below-minimum abort and full refund; `test_fire_belowMinimum_aborts`, `test_fire_whenCurveChanged_aborts`, `test_I9_launchRevert_abortsWithRefunds`, `test_F10_postAbortBurn_isSharedProRata` |
-| Nobody can abort a round by starving `fire()` of gas | Tested | `test_F16_*`; [SECURITY.md](SECURITY.md#why-f16-slipped-past-the-first-review) |
+| Nobody can end a round by making its launch fail (starved gas, a held Infinity lock): a failed launch reverts `fire()` and the round stays live | Tested | `test_F17_*`, `test_fork_fireInsideAForeignLock_revertsAndTheRoundStaysLive` (live Ascend); [SECURITY.md](SECURITY.md#what-f16-and-f17-taught-us) |
 | Verified rounds cap one wallet per Hyperliquid account, with published rules and refusals that come with evidence | Tested | `RoundVerified.t.sol`; API attestor tests; rules at `GET /rules/v1` |
 | $DRAFT stakers earn the platform basket by epoch; principal can never be frozen | Tested | `UpdraftStaking.t.sol`; API `epochs` tests |
 

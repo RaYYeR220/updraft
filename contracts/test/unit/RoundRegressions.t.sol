@@ -12,8 +12,8 @@ interface IERC20R {
     function balanceOf(address) external view returns (uint256);
 }
 
-/// @notice Regression tests for the pre-deployment self-audit (findings F03, F07, F09, F10, F14,
-/// F15, I1, I6, I9). Each reproduces the audited scenario and asserts the fixed behaviour.
+/// @notice Regression tests for the round's security findings (F03, F06, F07, F09, F10, F14, F15, F16,
+/// F17, I1, I6; see docs/SECURITY.md). Each reproduces the scenario and asserts the fixed behaviour.
 contract RoundRegressionsTest is RoundTestBase {
     LaunchCertificate internal certificate;
     UpdraftStaking internal staking;
@@ -153,10 +153,10 @@ contract RoundRegressionsTest is RoundTestBase {
     }
 
     // I9 / F06: a launch that reverts aborts the round instead of freezing it until fireBy.
-    // C1: a launch that reverts takes fire() down with it. A caller can make Ascend's launch revert at
+    // F17: a launch that reverts takes fire() down with it. A caller can make Ascend's launch revert at
     // will (by holding the Infinity vault's lock), so a revert must never end the round. If the launch
     // keeps failing, the fire-by deadline refunds everyone.
-    function test_C1_launchRevert_revertsFire_thenTheDeadlineRefunds() public {
+    function test_F17_launchRevert_revertsFire_thenTheDeadlineRefunds() public {
         RoundConfig memory cfg = _defaultConfig();
         UpdraftRound r = _round(cfg);
         _commit(r, alice, 500e6);
@@ -174,8 +174,8 @@ contract RoundRegressionsTest is RoundTestBase {
         assertEq(usdc.balanceOf(alice), 500e6);
     }
 
-    // C1: fire() sent from inside someone else's Infinity lock reverts; the round stays live.
-    function test_C1_fireInsideAForeignLock_revertsAndTheRoundStaysLive() public {
+    // F17: fire() sent from inside someone else's Infinity lock reverts; the round stays live.
+    function test_F17_fireInsideAForeignLock_revertsAndTheRoundStaysLive() public {
         UpdraftRound r = _round(_defaultConfig());
         _commit(r, alice, 500e6);
         vm.warp(block.timestamp + 1 hours);

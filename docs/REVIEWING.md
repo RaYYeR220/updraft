@@ -34,11 +34,11 @@ No wallet or setup is needed.
 
 | File | Why |
 |---|---|
-| `contracts/src/UpdraftRound.sol` → `fire()` | The whole launch in one function: preflight, gas floor, launch, fee parity, vault handoff, platform cut, certificate |
+| `contracts/src/UpdraftRound.sol` → `fire()` | The whole launch in one function: preflight, launch, fee parity, vault handoff, platform cut, certificate |
 | `contracts/src/lens/CurveLens.sol` | Ascend's curve, replicated to the wei, so `minDevOut` can be exact |
 | `contracts/src/CreatorVault.sol` → `queuePolicy` / `executePolicy` | Bounded, timelocked fee policy |
 | `contracts/test/fork/RoundFire.fork.t.sol` | The full flow against the live Ascend launchpad |
-| `docs/SECURITY.md` → F16 | A bug we found after our first deploy, why the textbook defence doesn't work against it, and the fix |
+| `docs/SECURITY.md` → F16, F17 | Two ways a caller could end a round by making its launch fail, why the textbook defence missed them, and the fix that closes the class |
 
 ## Run the tests
 
