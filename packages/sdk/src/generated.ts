@@ -1174,19 +1174,6 @@ export const updraftRoundAbi = [
   },
   {
     "type": "function",
-    "name": "LAUNCH_GAS_FLOOR",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "MAX_PARTICIPANTS",
     "inputs": [],
     "outputs": [
@@ -2838,11 +2825,6 @@ export const updraftRoundAbi = [
   },
   {
     "type": "error",
-    "name": "InsufficientGas",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "LaunchpadPaused",
     "inputs": []
   },
@@ -4049,6 +4031,11 @@ export const creatorVaultAbi = [
   {
     "type": "error",
     "name": "TooEarly",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "VaultLocked",
     "inputs": []
   },
   {
@@ -5720,6 +5707,19 @@ export const ascendLaunchpadAbi = [
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "vault",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "BidFunded",
     "inputs": [
@@ -5861,14 +5861,14 @@ export const ascendTokenCreationCode = "0x60e0806040523461046157610f2d8038038091
 
 export const elysiumTestnetDeployment = {
   "attestor": "0xEb596FD067a24a23df95D634EB926aA058237789",
-  "certificate": "0x14D29056e37fF1b9ae4913344ed03ea37103b3C6",
+  "certificate": "0xA85F433603001AA2b85272929157f31F9785cDd1",
   "chainId": 99801,
-  "deployBlock": 11109423,
+  "deployBlock": 11174917,
   "distributor": "0x99BD3d593C73422CB75ab9A0091EDe8fAA9348f9",
-  "factory": "0xCf96A98DcFd86365389592b0Fa1a878086fd6Ddb",
+  "factory": "0xA94cdA7c7184C060842569Da8dFC33Ca747Fb232",
   "launchpad": "0x6d01f6644bbf1b5074472D3e85aa1465B4d2bF3d",
-  "lens": "0xE48fB276DEc1d9F723eE88660E5545FB2a19321D",
-  "roundImplementation": "0x9311829fe15C393Ac599c82b26DD0214E417C733",
-  "staking": "0x80A74912c7ba86838DfEb8eDE818a2a2490BFC9D",
-  "vaultImplementation": "0x1DFEE40d31fd80397353DBbD7c787728903ff3b7"
+  "lens": "0x133a4133937a5CE0120E281623fe56bADCFC2bEA",
+  "roundImplementation": "0xFf5d6E05Ed6737C630F48cC633715e537f4b55E8",
+  "staking": "0x90A39170D14C22711dC7dDbeF1367d58cbFA7E6f",
+  "vaultImplementation": "0xA2BA1bEBFdc7dDa9fbf866aF4a8dAe1207B2F7ED"
 } as const;

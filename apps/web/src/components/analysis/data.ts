@@ -79,7 +79,7 @@ export function headline(a: Analysis) {
 }
 
 /** The live comparison: what a buyer right after T0 got per USDC, against everyone in the batch. */
-export const SNIPE_ROUND = "0xEf4f1b9E58bDAbDEf9b157A1EA1375fE699FCE8c";
+export const SNIPE_ROUND = "0x15f436B0D9A917179Fc5DD390072AD46Ed7aC03b";
 
 interface SwapRow {
   trader: string;

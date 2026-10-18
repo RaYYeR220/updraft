@@ -168,8 +168,7 @@ async function policyDemo(vault: Address) {
   );
   const { eta } = await creatorClient.pendingPolicy(vault);
   await until(eta);
-  // executePolicy keeps a gas floor for the fee pull, so give it room.
-  await record("execute it after the timelock", await creatorWallet.writeContract({ address: vault, abi: creatorVaultAbi, functionName: "executePolicy", gas: 3_000_000n }), "success");
+  await record("execute it after the timelock", await creatorClient.executePolicy(vault), "success");
   return { vault, outOfBounds, inBounds };
 }
 

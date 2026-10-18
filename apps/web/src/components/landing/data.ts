@@ -4,7 +4,7 @@ import { headline, loadAnalysis } from "@/components/analysis/data";
 import { isRehearsal as isRehearsalCreator } from "@/components/round/format";
 
 /** The first rehearsal round's token: its certificate is the plate on the landing. */
-export const REH1_TOKEN = "0x9B63bca41cd75A4471bea8CFEad882c11f1702Bb";
+export const REH1_TOKEN = "0xc8f59d265A064bcB20a2F8bf3027AEA502B9e0cA";
 
 /** Rounds we open ourselves to rehearse launches on testnet. */
 export const isRehearsal = (r: Pick<RoundRow, "creator">) => isRehearsalCreator(r.creator);

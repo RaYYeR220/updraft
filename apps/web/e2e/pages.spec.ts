@@ -5,8 +5,8 @@ const pages: [string, RegExp][] = [
   ["/", /Everyone lands/],
   ["/bottom-of-curve", /bottom of the curve/i],
   ["/rounds", /one price for everyone/],
-  ["/rounds/0xD4d5F75D7abDEb644586721870fE4cf92F28bDF6", /Updraft Rehearsal One/],
-  ["/certificate/0x9B63bca41cd75A4471bea8CFEad882c11f1702Bb", /Updraft Rehearsal One/],
+  ["/rounds/0xD5dF4e0537b171f05D415d7BDC0B6345f0815421", /Updraft Rehearsal One/],
+  ["/certificate/0xc8f59d265A064bcB20a2F8bf3027AEA502B9e0cA", /Updraft Rehearsal One/],
   ["/studio", /./],
   ["/stake", /DRAFT/],
   ["/docs", /./],
@@ -26,6 +26,6 @@ for (const [path, heading] of pages) {
 }
 
 test("the sniper comparison is read from the chain", async ({ page }) => {
-  await page.goto("/rounds/0xEf4f1b9E58bDAbDEf9b157A1EA1375fE699FCE8c");
+  await page.goto("/rounds/0x15f436B0D9A917179Fc5DD390072AD46Ed7aC03b");
   await expect(page.getByText(/5\.13× fewer tokens per USDC/)).toBeVisible({ timeout: 30_000 });
 });

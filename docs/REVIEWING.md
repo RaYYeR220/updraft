@@ -8,7 +8,7 @@ Open [updraft-weld.vercel.app/rounds](https://updraft-weld.vercel.app/rounds) an
 - the vault holding Ascend's creator role
 - the launch certificate
 
-To check the same thing on the explorer, open the fire transaction [0xa469e88e…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0xa469e88e9217bbf8f01b06eac27bf987c86af418db9b7fc9cbda16221469c1fe). It contains, in one transaction:
+To check the same thing on the explorer, open the fire transaction [0xffadb38c…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0xffadb38c47316841caca42c2244e9bfe07c9efc5b9cf6bf0909158158deb78a2). It contains, in one transaction:
 
 1. Ascend's `Launched`, with the round as the dev-buyer
 2. `BidFunded` (the 1% fee parity)

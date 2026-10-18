@@ -52,7 +52,7 @@ Ascend's launch already does two good things. The dev-buy is atomic and pays no 
 
 ## Proof, in one line
 
-A sniper bought 100 USDC of a token right after its round fired, while Ascend's launch fee was still 72.2%. The batch got 3.14× more tokens per USDC than the sniper. Every transaction is in [docs/PROOF.md](docs/PROOF.md).
+A bot's pre-signed 100 USDC buy landed one second after a round fired, while Ascend's launch fee was still 72.2%. The batch got 5.13× more tokens per USDC than the bot. Every transaction is in [docs/PROOF.md](docs/PROOF.md).
 
 ## Repository
 
@@ -73,16 +73,16 @@ Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Security review: [do
 
 ## Deployed
 
-Elysium testnet, chain 99801, from block 11,109,423.
+Elysium testnet, chain 99801, from block 11,174,917.
 
 | Contract | Address |
 |---|---|
-| UpdraftFactory | [0xCf96A98DcFd86365389592b0Fa1a878086fd6Ddb](https://elysium.kinetiq.xyz/testnet-explorer/address/0xCf96A98DcFd86365389592b0Fa1a878086fd6Ddb) |
-| UpdraftRound (implementation) | [0x9311829fe15C393Ac599c82b26DD0214E417C733](https://elysium.kinetiq.xyz/testnet-explorer/address/0x9311829fe15C393Ac599c82b26DD0214E417C733) |
-| CreatorVault (implementation) | [0x1DFEE40d31fd80397353DBbD7c787728903ff3b7](https://elysium.kinetiq.xyz/testnet-explorer/address/0x1DFEE40d31fd80397353DBbD7c787728903ff3b7) |
-| LaunchCertificate | [0x14D29056e37fF1b9ae4913344ed03ea37103b3C6](https://elysium.kinetiq.xyz/testnet-explorer/address/0x14D29056e37fF1b9ae4913344ed03ea37103b3C6) |
-| UpdraftStaking | [0x80A74912c7ba86838DfEb8eDE818a2a2490BFC9D](https://elysium.kinetiq.xyz/testnet-explorer/address/0x80A74912c7ba86838DfEb8eDE818a2a2490BFC9D) |
-| UpdraftLens | [0xE48fB276DEc1d9F723eE88660E5545FB2a19321D](https://elysium.kinetiq.xyz/testnet-explorer/address/0xE48fB276DEc1d9F723eE88660E5545FB2a19321D) |
+| UpdraftFactory | [0xA94cdA7c7184C060842569Da8dFC33Ca747Fb232](https://elysium.kinetiq.xyz/testnet-explorer/address/0xA94cdA7c7184C060842569Da8dFC33Ca747Fb232) |
+| UpdraftRound (implementation) | [0xFf5d6E05Ed6737C630F48cC633715e537f4b55E8](https://elysium.kinetiq.xyz/testnet-explorer/address/0xFf5d6E05Ed6737C630F48cC633715e537f4b55E8) |
+| CreatorVault (implementation) | [0xA2BA1bEBFdc7dDa9fbf866aF4a8dAe1207B2F7ED](https://elysium.kinetiq.xyz/testnet-explorer/address/0xA2BA1bEBFdc7dDa9fbf866aF4a8dAe1207B2F7ED) |
+| LaunchCertificate | [0xA85F433603001AA2b85272929157f31F9785cDd1](https://elysium.kinetiq.xyz/testnet-explorer/address/0xA85F433603001AA2b85272929157f31F9785cDd1) |
+| UpdraftStaking | [0x90A39170D14C22711dC7dDbeF1367d58cbFA7E6f](https://elysium.kinetiq.xyz/testnet-explorer/address/0x90A39170D14C22711dC7dDbeF1367d58cbFA7E6f) |
+| UpdraftLens | [0x133a4133937a5CE0120E281623fe56bADCFC2bEA](https://elysium.kinetiq.xyz/testnet-explorer/address/0x133a4133937a5CE0120E281623fe56bADCFC2bEA) |
 | Ascend launchpad (theirs) | [0x6d01f6644bbf1b5074472D3e85aa1465B4d2bF3d](https://elysium.kinetiq.xyz/testnet-explorer/address/0x6d01f6644bbf1b5074472D3e85aa1465B4d2bF3d) |
 
 ## Run it

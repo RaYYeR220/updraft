@@ -17,7 +17,7 @@ Every claim Updraft makes, and how far it is proven.
 | A round's whole pot goes through Ascend's launch as one fee-free buy, at one average price for every wallet | Live, Tested | Rehearsal One `fire`; `test_fork_fullRound_onLiveAscend` |
 | The token's address is known before launch | Live, Tested | The round stores `expectedToken` at creation; `TokenAddress.t.sol` matches a live launch |
 | The price preview equals Ascend's actual launch output to the wei | Tested | `test_preview_equalsActualDevBuy_fuzzOverSizes` (ten live launches, both orderings) |
-| A buyer right after fire gets fewer tokens per USDC than the batch | Live, Tested | Sniper runs: 5.13× at 1 s and 2.26× at 2 s after fire; same block on a fork: `test_fork_sniperAfterFire_paysTaxAndHigherPrice` |
+| A buyer right after fire gets fewer tokens per USDC than the batch | Live, Tested | [Sniper run](PROOF.md#the-sniper-comparison): 5.13× at 1 s after fire (2.26× at 2 s on an earlier deployment); same block on a fork: `test_fork_sniperAfterFire_paysTaxAndHigherPrice` |
 | Tokens are pushed to wallets right after fire, and oversubscription is refunded pro-rata | Live, Tested | Rehearsal `distribute`; `test_distribute_chunks_pushAll_noDoublePay`, `test_fire_overMaxRaise_scalesAndRefunds` |
 | The dev's own share vests in public (cliff + linear) and can't be claimed early | Live, Tested | [Refusals](PROOF.md#refusals): early claim reverts `NothingToClaim()`; `test_creator_cannotClaimBeforeCliff`, `test_creator_linearAfterCliff`, `test_create_rejectsWeakCreatorVesting` |
 | Ascend's creator role is held by a fee vault from the launch transaction on | Live, Tested | Rehearsal `fire`; the vault is the pool's creator on-chain |
