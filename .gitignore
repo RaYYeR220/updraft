@@ -8,8 +8,6 @@ coverage/
 *.tsbuildinfo
 contracts/out/
 contracts/cache/
-contracts/broadcast/*/31337/
-contracts/broadcast/**/dry-run/
 
 # env / secrets
 .env
@@ -20,10 +18,11 @@ contracts/broadcast/**/dry-run/
 .DS_Store
 Thumbs.db
 
-# local fork deployments
+# local deployments and caches
 deployments/anvil*.json
 contracts/broadcast/
 contracts/broadcast-fork/
 services/analysis/out/cache/
-
-.vercel
+.vercel/
+test-results/
+playwright-report/

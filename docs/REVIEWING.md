@@ -23,9 +23,9 @@ The round **Updraft Sniper Test** fired, and a bot's pre-signed 100 USDC buy lan
 
 ## 3. Join or run a round yourself (2 min)
 
-You need a wallet on Elysium testnet (chain 99801, RPC `https://testnet-rpc.elysium.kinetiq.xyz`). Without one, the app's demo wallet works in the browser.
+No wallet or setup is needed.
 
-1. **Get test USDC.** The app's drip button sends 5,000 test USDC and a little HYPE for gas.
+1. **Connect → "Try with a demo wallet".** The app creates a throwaway wallet in your browser and funds it with 5,000 test USDC and a little HYPE for gas. A browser wallet on Elysium testnet also works (chain 99801, RPC `https://testnet-rpc.elysium.kinetiq.xyz`).
 2. **Open a live round and commit.** It takes one signature: a permit plus the commit. The preview shows what everyone pays if the round fired now.
 3. **Or start a round in `/studio`.** Choose short windows. The studio shows the token's address, and what it would buy, before you sign.
 4. **Fire after close.** Anyone can send the transaction, including you. The keeper will also fire it.

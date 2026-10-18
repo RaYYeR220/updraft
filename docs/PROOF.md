@@ -103,6 +103,15 @@ Script: `services/keeper/scripts/refusals.ts`.
 | Analysis | 4 | `pnpm --filter @updraft/analysis test` |
 | Widget | 4 | `pnpm --filter @updraft/widget test` |
 | SDK, end to end on an anvil fork of Elysium with the real deploy script | 2 | `pnpm --filter @updraft/sdk test` |
+| Web, against the live app: every page on desktop and mobile, plus the full visitor path below | 19 | `pnpm --filter @updraft/web test:e2e` |
+
+The visitor path (`apps/web/e2e/judge-path.spec.ts`) uses no wallet and no setup, and nothing is mocked. It runs against the deployed app and Elysium testnet in about three minutes:
+
+1. A demo wallet opens a two-minute round in the studio.
+2. A second visitor's demo wallet commits 250 USDC with one signature.
+3. Our keeper fires the round at T0.
+4. The test waits until the visitor's wallet holds exactly its share of the batch.
+5. It opens the launch certificate.
 
 The fork tests run the real Ascend launchpad, not a stand-in:
 

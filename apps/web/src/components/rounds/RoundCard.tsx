@@ -26,7 +26,7 @@ function statusOf(r: RoundRow, now: number): { label: string; cls: string } {
 /** One field-guide card per round. `no` is the round's position in the factory that created it. */
 export function RoundCard({ r, no, now }: { r: RoundRow; no: number | null; now: number }) {
   const st = statusOf(r, now);
-  const rehearsal = isRehearsal(r.creator);
+  const rehearsal = isRehearsal(r.creator, r.name);
   const committed = usdcNum(r.totalCommitted);
   const max = usdcNum(r.maxRaise);
   const fill = r.status === "fired" ? 100 : Math.min(100, max ? (committed / max) * 100 : 0);

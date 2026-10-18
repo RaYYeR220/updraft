@@ -110,6 +110,7 @@ To deploy your own stack: `contracts/script/Deploy.s.sol` (env: `DEPLOYER_PRIVAT
 | Analysis | 4 |
 | Widget | 4 |
 | SDK (end to end on an Elysium fork) | 2 |
+| Web (Playwright, against the live app and testnet) | 19 |
 
 ## Limits we know about
 

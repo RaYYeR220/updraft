@@ -1,8 +1,9 @@
 import { AbortReasons } from "@updraft/sdk";
 
-/** Rounds created by Updraft's own deployer are rehearsals, not launches. */
+/** Rounds created by Updraft's own deployer, or by our end-to-end test, are rehearsals, not launches. */
 export const UPDRAFT_DEPLOYER = "0xc6d9588923181fbb84acf028a85c442421828f02";
-export const isRehearsal = (creator: string) => creator.toLowerCase() === UPDRAFT_DEPLOYER;
+export const isRehearsal = (creator: string, name = "") =>
+  creator.toLowerCase() === UPDRAFT_DEPLOYER || /^Updraft E2E\b/.test(name);
 
 const Q96 = 2 ** 96;
 /** Raw quote (6 dp) per raw token (18 dp) to USDC per whole token. */

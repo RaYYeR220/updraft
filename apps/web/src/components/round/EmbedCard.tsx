@@ -71,7 +71,7 @@ export function EmbedCard({ address }: { address: Address }) {
             {s.config.name} <small>${s.config.symbol}</small>
           </h1>
           <p className="em-sub">
-            {s.config.mode === 1 ? "Verified round" : "Open round"} on Ascend{isRehearsal(s.config.creator) ? ", a rehearsal" : ""}
+            {s.config.mode === 1 ? "Verified round" : "Open round"} on Ascend{isRehearsal(s.config.creator, s.config.name) ? ", a rehearsal" : ""}
           </p>
         </div>
         <span className={`em-st ${phase}`}>

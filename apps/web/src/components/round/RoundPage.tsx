@@ -158,7 +158,7 @@ function Round({ address }: { address: Address }) {
     }
   }
 
-  const rehearsal = isRehearsal(cfg.creator);
+  const rehearsal = isRehearsal(cfg.creator, cfg.name);
   const row = idx.round.data as RoundRow | null | undefined;
   const youIn = !!position.data && position.data.committed + (mode === "commit" ? rawExtra : 0n) > 0n;
 
