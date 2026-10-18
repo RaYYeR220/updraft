@@ -21,6 +21,7 @@ const updraft = createUpdraftClient({ publicClient, walletClient, deployment });
 const cursors = new Map<Address, number>();
 const harvestedAt = new Map<Address, number>();
 const inFlight = new Set<string>();
+const failures = new Map<Address, { count: number; until: number }>();
 
 async function snapshot(): Promise<RoundView[]> {
   const addresses = await updraft.listRounds();
@@ -61,9 +62,16 @@ async function run(a: Action) {
       if (a.kind === "harvest") harvestedAt.set(a.round, Math.floor(Date.now() / 1000));
     }
     console.log(`${a.kind} ${a.round} ${receipt.status} ${hash}`);
+    if (receipt.status !== "success") throw new Error("reverted");
+    failures.delete(a.round);
   } catch (e) {
     console.error(`${a.kind} ${a.round} failed: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
     if (a.kind === "harvest") harvestedAt.set(a.round, Math.floor(Date.now() / 1000));
+    // Exponential back-off per round, so one failing round cannot eat the budget.
+    const f = failures.get(a.round) ?? { count: 0, until: 0 };
+    f.count += 1;
+    f.until = Date.now() + Math.min(3_600_000, 30_000 * 2 ** f.count);
+    failures.set(a.round, f);
   } finally {
     inFlight.delete(k);
   }
@@ -73,7 +81,9 @@ async function tick() {
   try {
     const views = await snapshot();
     const now = Number((await publicClient.getBlock()).timestamp);
-    for (const action of plan(views, now, inFlight)) {
+    const blocked = new Set(inFlight);
+    for (const [round, f] of failures) if (f.until > Date.now()) blocked.add(`backoff:${round}`);
+    for (const action of plan(views, now, blocked)) {
       // A gas budget: rounds are permissionless, so the keeper never spends without limit.
       while (sentAt.length && sentAt[0] < Date.now() - 3_600_000) sentAt.shift();
       if (sentAt.length >= MAX_TX_PER_HOUR) {

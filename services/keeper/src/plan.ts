@@ -34,10 +34,13 @@ export function plan(
 ): Action[] {
   const actions: Action[] = [];
   const max = opts.maxActions ?? 10;
-  for (const r of rounds) {
+  // Most urgent first: live rounds by fire deadline, then fired rounds (distribution, harvest).
+  const ordered = [...rounds].sort((a, b) => (a.status - b.status) || (a.fireBy - b.fireBy));
+  for (const r of ordered) {
     if (actions.length >= max) break;
     // Rounds are permissionless; one nobody committed to holds nothing to fire or refund.
     if (r.totalCommitted === 0n) continue;
+    if (inFlight.has(`backoff:${r.address}`)) continue;
     let next: Action | null = null;
     if (r.status === 0) {
       if (nowSec > r.fireBy) next = { kind: "abort", round: r.address };

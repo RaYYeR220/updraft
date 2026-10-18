@@ -22,6 +22,7 @@ const fakeState = {
 
 const tools = buildTools({
   updraft: {
+    isRound: async (r: Address) => r === ROUND,
     listRounds: async () => [ROUND],
     getRound: async () => fakeState as never,
     previewCommit: async (_r: Address, extra: bigint) => ({ effective: extra, tokensOut: 99n, netTokens: 98n, avgPriceX96: 5n }),
@@ -30,6 +31,7 @@ const tools = buildTools({
   factory: FACTORY,
   analysisUrl: "https://api.example/analysis",
   fetchFn: async () => new Response(JSON.stringify({ summary: { launches: 251 } })),
+  now: () => 50,
 });
 const tool = (name: string) => {
   const t = tools.find((x) => x.name === name);
@@ -106,6 +108,29 @@ describe("mcp tools", () => {
     const decoded = decodeFunctionData({ abi: updraftFactoryAbi, data: out.transaction.data });
     expect(decoded.functionName).toBe("createRound");
     expect((decoded.args[0] as { raise: { maxRaise: bigint } }).raise.maxRaise).toBe(50_000_000_000n);
+  });
+
+  it("refuses to build transactions for a contract that is not an Updraft round", async () => {
+    const out = (await tool("updraft_build_commit_tx").handler({ round: WALLET, wallet: WALLET, amount: "1" })) as Record<string, unknown>;
+    expect(out).toMatchObject({ ok: false, reason: "not_an_updraft_round" });
+    const read = (await tool("updraft_get_round").handler({ round: WALLET })) as Record<string, unknown>;
+    expect(read).toMatchObject({ ok: false, reason: "not_an_updraft_round" });
+  });
+
+  it("refuses to build a commit for a round that is not open", async () => {
+    const closed = buildTools({
+      updraft: {
+        isRound: async () => true,
+        listRounds: async () => [ROUND],
+        getRound: async () => ({ ...fakeState, status: 1 }) as never,
+        previewCommit: async () => ({}) as never,
+        getCertificate: async () => ({}) as never,
+      },
+      factory: FACTORY,
+      analysisUrl: "x",
+      now: () => 50,
+    }).find((t) => t.name === "updraft_build_commit_tx")!;
+    expect(await closed.handler({ round: ROUND, wallet: WALLET, amount: "1" })).toMatchObject({ ok: false, reason: "round_not_open" });
   });
 
   it("returns the bottom-of-curve analysis", async () => {

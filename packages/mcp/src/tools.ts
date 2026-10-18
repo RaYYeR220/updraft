@@ -3,10 +3,11 @@ import { z } from "zod";
 import { EMPTY_VOUCHER, type RoundConfig, type UpdraftClient, updraftFactoryAbi, updraftRoundAbi } from "@updraft/sdk";
 
 export interface ToolDeps {
-  updraft: Pick<UpdraftClient, "listRounds" | "getRound" | "previewCommit" | "getCertificate">;
+  updraft: Pick<UpdraftClient, "isRound" | "listRounds" | "getRound" | "previewCommit" | "getCertificate">;
   factory: Address;
   analysisUrl: string;
   fetchFn?: typeof fetch;
+  now?: () => number;
 }
 
 export interface Tool {
@@ -46,7 +47,12 @@ const roundConfig = z.object({
   exitEnabled: z.boolean(),
 });
 
-export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch }: ToolDeps): Tool[] {
+const NOT_A_ROUND = { ok: false, reason: "not_an_updraft_round" } as const;
+
+export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch, now = () => Math.floor(Date.now() / 1000) }: ToolDeps): Tool[] {
+  // Every tool that takes a round first checks the factory created it: an arbitrary contract could
+  // otherwise impersonate a round and steer an approval to itself.
+  const known = (round: unknown) => updraft.isRound(round as Address);
   return [
     {
       name: "updraft_list_rounds",
@@ -59,14 +65,15 @@ export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch }: T
       description:
         "Full state of one round: config, status (0 live, 1 fired, 2 aborted), total committed, participants, the fire preview (tokens the batch buys at one price) and, once fired, the token, pool, vault and amounts.",
       inputSchema: { round: address },
-      handler: async ({ round }) => plain(await updraft.getRound(round as Address)),
+      handler: async ({ round }) => ((await known(round)) ? plain(await updraft.getRound(round as Address)) : NOT_A_ROUND),
     },
     {
       name: "updraft_preview_price",
       description:
         "What everyone would pay if `amount` more quote (raw units, e.g. 6-decimal USDC) were committed to the round now: effective batch, tokens out, net tokens and average price (Q64.96).",
       inputSchema: { round: address, amount: uint },
-      handler: async ({ round, amount }) => plain(await updraft.previewCommit(round as Address, BigInt(amount as string))),
+      handler: async ({ round, amount }) =>
+        (await known(round)) ? plain(await updraft.previewCommit(round as Address, BigInt(amount as string))) : NOT_A_ROUND,
     },
     {
       name: "updraft_get_certificate",
@@ -92,7 +99,13 @@ export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch }: T
         "Build the unsigned transactions for `wallet` to commit `amount` (raw quote units) into an Open round: an ERC-20 approve and the commit. Never signs or sends anything.",
       inputSchema: { round: address, wallet: address, amount: uint },
       handler: async ({ round, wallet, amount }) => {
+        if (!(await known(round))) return NOT_A_ROUND;
         const state = await updraft.getRound(round as Address);
+        const t = now();
+        const w = state.config.windows as { openAt?: number; closeAt: number };
+        if (state.status !== 0 || t >= w.closeAt || (w.openAt !== undefined && t < w.openAt)) {
+          return { ok: false, reason: "round_not_open" };
+        }
         const value = BigInt(amount as string);
         return {
           transactions: [

@@ -239,6 +239,7 @@ export function createUpdraftClient({ publicClient, walletClient, deployment, ap
     predictToken,
     predictRound: (roundSalt: Hex, deployer: Address) =>
       publicClient.readContract({ ...factory, functionName: "predictRound", args: [roundSalt, deployer] }),
+    isRound: (address: Address) => publicClient.readContract({ ...factory, functionName: "isRound", args: [address] }),
     getRound,
     listRounds,
     previewFire: (address: Address) =>

@@ -53,6 +53,18 @@ describe("keeper plan", () => {
     expect(plan(many, 1000, new Set(), { chunk: 100, harvestEverySec: 1800, maxActions: 10 })).toHaveLength(10);
   });
 
+  it("serves the nearest deadline first when capped", () => {
+    const late = { ...base, address: R(1), fireBy: 9000 };
+    const soon = { ...base, address: R(2), fireBy: 3000 };
+    expect(plan([late, soon], 1000, new Set(), { chunk: 100, harvestEverySec: 1800, maxActions: 1 })).toEqual([
+      { kind: "fire", round: R(2) },
+    ]);
+  });
+
+  it("skips rounds that are backing off after failures", () => {
+    expect(plan([{ ...base }], 1000, new Set([`backoff:${R(1)}`]))).toEqual([]);
+  });
+
   it("leaves aborted rounds alone", () => {
     expect(plan([{ ...base, status: 2 }], 9999, new Set())).toEqual([]);
   });
