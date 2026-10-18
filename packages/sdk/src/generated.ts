@@ -1174,6 +1174,19 @@ export const updraftRoundAbi = [
   },
   {
     "type": "function",
+    "name": "LAUNCH_GAS_FLOOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_PARTICIPANTS",
     "inputs": [],
     "outputs": [
@@ -2821,6 +2834,11 @@ export const updraftRoundAbi = [
   {
     "type": "error",
     "name": "IdentityTaken",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientGas",
     "inputs": []
   },
   {

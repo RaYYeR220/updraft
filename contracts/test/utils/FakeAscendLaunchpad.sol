@@ -6,6 +6,22 @@ import {CurveLens} from "../../src/lens/CurveLens.sol";
 import {ASCEND_TOKEN_CREATION_CODE} from "../../src/ascend/AscendTokenCode.sol";
 import {LiveCurve} from "./LiveCurve.sol";
 
+/// @dev Spends `amount` gas the way a heavy call on the real contracts would, and runs out of gas
+/// when the caller forwarded less.
+function burnGas(uint256 amount) view {
+    uint256 start = gasleft();
+    while (start - gasleft() < amount) {}
+}
+
+/// @dev Burns gas a few calls deep, like the swap inside Ascend's launch (launchpad, vault,
+/// callback, hook), so a starved launch hands its caller back more than the usual 1/64.
+contract GasSink {
+    function sink(uint256 depth, uint256 amount) external view {
+        if (depth == 0) return burnGas(amount);
+        this.sink(depth - 1, amount);
+    }
+}
+
 interface IERC20Min {
     function transfer(address, uint256) external returns (bool);
     function transferFrom(address, address, uint256) external returns (bool);
@@ -43,6 +59,8 @@ contract FakeAscendLaunchpad {
     mapping(bytes32 => uint256) public bidInventory;
     bool public quoteClaimReverts;
     bool public launchReverts;
+    uint256 public launchGas;
+    GasSink internal immutable sink = new GasSink();
     mapping(bytes32 => uint256) public listingOwed;
 
     event Launched(
@@ -90,6 +108,10 @@ contract FakeAscendLaunchpad {
         launchReverts = v;
     }
 
+    function setLaunchGas(uint256 amount) external {
+        launchGas = amount;
+    }
+
     /// @dev Models Ascend's listing set-aside: funds the desk can pay to the creator role.
     function setListingOwed(bytes32 poolId, uint256 amount) external {
         listingOwed[poolId] = amount;
@@ -109,6 +131,7 @@ contract FakeAscendLaunchpad {
     function launch(IAscendLaunchpad.LaunchParams calldata p) external returns (address token, bytes32 poolId) {
         if (paused) revert LaunchesArePaused();
         require(!launchReverts, "launch reverts");
+        if (launchGas > 0) sink.sink(3, launchGas);
         if (p.creator == address(0)) revert ZeroCreator();
         IAscendLaunchpad.QuoteConfig memory qc = _quote[p.quote];
         if (!qc.allowed) revert QuoteNotAllowed();
@@ -244,6 +267,7 @@ contract FakeListingDesk {
     mapping(address => uint256) public enrolledCap;
     mapping(bytes32 => uint256) public enrolledCapOf;
     bool public refuseAll;
+    uint256 public enrollGas;
 
     error Refused();
 
@@ -255,7 +279,12 @@ contract FakeListingDesk {
         refuseAll = v;
     }
 
+    function setEnrollGas(uint256 amount) external {
+        enrollGas = amount;
+    }
+
     function enroll(address token, address quote, uint256 cap) external {
+        burnGas(enrollGas);
         bytes32 poolId = keccak256(abi.encode(token, quote));
         if (refuseAll || msg.sender != launchpad.poolCreator(poolId) || cap == 0 || cap > type(uint88).max) {
             revert Refused();

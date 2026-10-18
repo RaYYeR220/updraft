@@ -39,6 +39,10 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     using SafeTransferLib for address;
 
     uint256 public constant MAX_PARTICIPANTS = 1000;
+    /// @dev Gas Ascend's launch is guaranteed. A launch that reverts aborts the round, so one that
+    /// merely ran out of the gas a caller chose to send must not: about twice the 2.42M gas a buyout
+    /// of the whole live curve takes.
+    uint256 public constant LAUNCH_GAS_FLOOR = 5_000_000;
     bytes32 public constant VOUCHER_TYPEHASH =
         keccak256("Voucher(address round,address wallet,bytes32 identityId,uint64 expiry,bytes32 evidenceHash)");
 
@@ -66,6 +70,7 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     error NothingToClaim();
     error TokenMismatch();
     error LaunchpadPaused();
+    error InsufficientGas();
 
     event Committed(
         address indexed wallet, bytes32 indexed identityId, uint256 amount, uint256 walletTotal, uint256 roundTotal
@@ -323,11 +328,13 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     }
 
     /// @dev The dev-buy. The round is the creator at launch, so the tokens land here. A launch that
-    /// reverts for any reason reports failure instead of reverting fire().
+    /// reverts for any reason reports failure instead of reverting fire(); a caller who sends less
+    /// than LAUNCH_GAS_FLOOR is turned away first.
     function _launch(uint256 devBuy, uint256 balanceBefore) internal returns (bool ok, uint256 spent) {
         IAscendLaunchpad lp = IAscendLaunchpad(_cfg.launchpad);
         (uint256 expectedOut,) = CurveLens.preview(lp, _cfg.quote, expectedToken < _cfg.quote, devBuy);
         _cfg.quote.safeApprove(address(lp), devBuy);
+        if (gasleft() < LAUNCH_GAS_FLOOR) revert InsufficientGas();
         try lp.launch(
             IAscendLaunchpad.LaunchParams({
                 name: _cfg.name,

@@ -36,6 +36,15 @@ contract VaultRegressionsTest is Test {
     }
 
     function _vault(uint256 listingCap, bool exitEnabled) internal returns (CreatorVault v, address token, bytes32 pid) {
+        (v, token, pid) = _offeredVault(listingCap, exitEnabled);
+        v.acceptRole();
+    }
+
+    /// @dev A vault that has been offered Ascend's creator role but not accepted it yet.
+    function _offeredVault(uint256 listingCap, bool exitEnabled)
+        internal
+        returns (CreatorVault v, address token, bytes32 pid)
+    {
         (token, pid) = lp.launch(
             IAscendLaunchpad.LaunchParams("Vaulted", "VLT", address(usdc), 10_000e6, 0, bytes32(++salt), address(this))
         );
@@ -55,7 +64,6 @@ contract VaultRegressionsTest is Test {
             })
         );
         lp.transferCreator(pid, address(v));
-        v.acceptRole();
     }
 
     function _stake(CreatorVault v, address token, address who, uint256 amount) internal {
@@ -153,5 +161,15 @@ contract VaultRegressionsTest is Test {
         lp.desk().setRefuseAll(true);
         (CreatorVault v,, bytes32 pid) = _vault(100e6, false);
         assertEq(lp.poolCreator(pid), address(v));
+    }
+
+    // F16 (vault side): accepting the role with too little gas for the desk reverts; it can't skip the listing.
+    function test_F16_starvedListing_revertsInsteadOfSkipping() public {
+        lp.desk().setEnrollGas(600_000);
+        (CreatorVault v,, bytes32 pid) = _offeredVault(100e6, false);
+        vm.expectRevert(CreatorVault.InsufficientGas.selector);
+        v.acceptRole{gas: 500_000}();
+        v.acceptRole();
+        assertEq(lp.desk().enrolledCapOf(pid), 100e6);
     }
 }

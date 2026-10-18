@@ -29,6 +29,9 @@ contract CreatorVault is ReentrancyGuard {
     uint256 internal constant MAX_QUOTE_INCOME = 1e30;
     /// @dev Gas kept for the fee pull before a policy change or exit, so it cannot be starved.
     uint256 internal constant PULL_GAS_FLOOR = 1_500_000;
+    /// @dev Gas the listing desk is guaranteed, so a refused enrollment means the desk refused it
+    /// rather than ran out of gas (about 2.6 times the 287k a live enrollment takes).
+    uint256 internal constant ENROLL_GAS_FLOOR = 750_000;
 
     struct InitParams {
         address launchpad;
@@ -134,6 +137,7 @@ contract CreatorVault is ReentrancyGuard {
         if (msg.sender != round) revert OnlyRound();
         launchpad.acceptCreator(poolId);
         if (listingCap > 0) {
+            if (gasleft() < ENROLL_GAS_FLOOR) revert InsufficientGas();
             try IListingDesk(launchpad.listingDesk()).enroll(token, quote, listingCap) {
                 emit ListingEnrolled(listingCap);
             } catch {

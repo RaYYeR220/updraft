@@ -12,6 +12,9 @@ import {
     RoundConfig, Mode, Windows, Raise, Vesting, Policy, PolicyBounds, Params, Voucher
 } from "../../src/interfaces/IUpdraft.sol";
 import {AscendSwapper} from "../utils/AscendSwapper.sol";
+import {CurveLens} from "../../src/lens/CurveLens.sol";
+import {IAscendLaunchpad} from "../../src/interfaces/IAscendLaunchpad.sol";
+import {Status, AbortReason} from "../../src/interfaces/IUpdraft.sol";
 
 contract RoundFireForkTest is ForkBase {
     address internal constant INFINITY_VAULT = 0x2B738A9A69b7a45C9dA6B519f6bE6efBfb912aec;
@@ -115,6 +118,32 @@ contract RoundFireForkTest is ForkBase {
         uint256 batchPerUsdc = round.netTokens() * 1e6 / round.quoteUsed();
         uint256 sniperPerUsdc = sniped * 1e6 / 100e6;
         assertLt(sniperPerUsdc * 10, batchPerUsdc, "the sniper gets under a tenth of the batch's tokens per dollar");
+    }
+
+    // A fire that buys out the whole live curve costs less in total than the gas the launch alone is
+    // guaranteed, so the floor never turns an honest launch into an abort.
+    function test_fork_fullCurveBuyout_fitsUnderTheLaunchGasFloor() public {
+        uint256 capacity = CurveLens.capacity(IAscendLaunchpad(LAUNCHPAD), USDC, false);
+        RoundConfig memory cfg = _cfg();
+        cfg.raise.maxRaise = uint128(capacity);
+        cfg.raise.walletCap = uint128(capacity);
+        vm.prank(creator);
+        (address r,) = factory.createRound(cfg, bytes32(uint256(2)));
+        UpdraftRound round = UpdraftRound(r);
+        Voucher memory none;
+        _mintUsdc(wallets[0], capacity);
+        vm.startPrank(wallets[0]);
+        IERC20Like(USDC).approve(r, capacity);
+        round.commit(capacity, none, "");
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1 hours);
+
+        uint256 before = gasleft();
+        round.fire();
+        uint256 used = before - gasleft();
+        assertEq(uint8(round.abortReason()), uint8(AbortReason.None));
+        assertEq(uint8(round.status()), uint8(Status.Fired));
+        assertLt(used, round.LAUNCH_GAS_FLOOR(), "the whole fire fits inside the launch's guarantee");
     }
 
     function test_fork_vault_harvestsLiveFees() public {

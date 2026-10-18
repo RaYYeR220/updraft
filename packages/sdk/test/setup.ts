@@ -42,7 +42,15 @@ export async function setup() {
     ["script", "script/Deploy.s.sol", "--rpc-url", url, "--broadcast", "--slow"],
     {
       cwd: contracts,
-      env: { ...process.env, DEPLOYER_PRIVATE_KEY: DEPLOYER_KEY, ATTESTOR_ADDRESS: ATTESTOR, DEPLOYMENTS_FILE: "anvil.json" },
+      // The fork shares Elysium's chain id, so its broadcast record goes to its own directory and never
+      // replaces the real deployment's.
+      env: {
+        ...process.env,
+        DEPLOYER_PRIVATE_KEY: DEPLOYER_KEY,
+        ATTESTOR_ADDRESS: ATTESTOR,
+        DEPLOYMENTS_FILE: "anvil.json",
+        FOUNDRY_BROADCAST: "broadcast-fork",
+      },
       encoding: "utf8",
       shell: process.platform === "win32",
     },

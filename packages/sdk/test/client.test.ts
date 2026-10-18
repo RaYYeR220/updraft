@@ -129,6 +129,7 @@ describe("updraft sdk on an Elysium fork", () => {
     await publicClient.waitForTransactionReceipt({ hash: fire });
 
     const after = await clients[0].getRound(round);
+    expect(after.abortReason).toBe("none");
     expect(after.status).toBe(Status.Fired);
     expect(after.fired?.tokensOut).toBe(preview.tokensOut);
 

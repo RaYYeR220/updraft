@@ -165,6 +165,19 @@ contract RoundRegressionsTest is RoundTestBase {
         assertEq(usdc.balanceOf(alice), 500e6);
     }
 
+    // F16: a fire sent with too little gas for Ascend's launch reverts; it can't abort the round.
+    function test_F16_starvedLaunch_revertsAndRoundStaysLive() public {
+        UpdraftRound r = _round(_defaultConfig());
+        _commit(r, alice, 500e6);
+        lp.setLaunchGas(2_500_000);
+        vm.warp(block.timestamp + 1 hours);
+        vm.expectRevert(UpdraftRound.InsufficientGas.selector);
+        r.fire{gas: 2_000_000}();
+        assertEq(uint8(r.status()), uint8(Status.Live));
+        r.fire();
+        assertEq(uint8(r.status()), uint8(Status.Fired));
+    }
+
     // F06: a listing the desk refuses no longer blocks the launch.
     function test_F06_refusedListing_doesNotBlockFire() public {
         RoundConfig memory cfg = _defaultConfig();
