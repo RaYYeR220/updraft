@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/.next
+**/.ponder
+**/dist
+contracts/lib
+contracts/out
+contracts/cache
+contracts/broadcast
+apps

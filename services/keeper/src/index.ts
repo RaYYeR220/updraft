@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { type Address, type Hex, createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { type Deployment, Status, createUpdraftClient, elysiumTestnet } from "@updraft/sdk";
@@ -102,8 +103,16 @@ async function tick() {
   }
 }
 
+let lastTick = 0;
+// A small status endpoint: the hosting platform needs a port, and it shows the keeper is alive.
+createServer((_req, res) => {
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(JSON.stringify({ ok: true, keeper: walletClient.account.address, lastTick, inFlight: [...inFlight] }));
+}).listen(Number(process.env.PORT ?? 8080));
+
 console.log(`keeper for factory ${deployment.factory} as ${walletClient.account.address}`);
 for (;;) {
   await tick();
+  lastTick = Date.now();
   await new Promise((r) => setTimeout(r, INTERVAL_MS));
 }
