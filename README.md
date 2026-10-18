@@ -9,6 +9,7 @@ Updraft runs on Elysium testnet (chain 99801) against the real Ascend launchpad.
 - **App:** https://updraft-weld.vercel.app
 - **API:** https://updraft-api-494617981995.us-central1.run.app
 - **Indexer:** https://updraft-indexer-494617981995.us-central1.run.app
+- **MCP server (Streamable HTTP):** https://updraft-mcp-494617981995.us-central1.run.app/mcp
 - **Contracts:** listed under [Deployed](#deployed). All are verified on Blockscout.
 - **Proof:** [docs/PROOF.md](docs/PROOF.md) lists every live transaction. To check the whole thing in five minutes, follow [docs/REVIEWING.md](docs/REVIEWING.md).
 
