@@ -1,6 +1,7 @@
 # deps / builds
 node_modules/
 .next/
+.next-*/
 .ponder/
 dist/
 coverage/
