@@ -16,7 +16,7 @@ const fakeState = {
   totalCommitted: 1_000_000_000n,
   participantCount: 3,
   verifiedCount: 0,
-  config: { quote: USDC, name: "Test", symbol: "TST", windows: { closeAt: 100 }, raise: { maxRaise: 5n } },
+  config: { quote: USDC, name: "Test", symbol: "TST", mode: 0, windows: { closeAt: 100 }, raise: { maxRaise: 5n } },
   preview: { usable: 1n, effective: 1n, parity: 0n, devBuy: 1n, tokensOut: 10n, platformTokens: 0n, avgPriceX96: 7n },
 };
 
@@ -131,6 +131,25 @@ describe("mcp tools", () => {
       now: () => 50,
     }).find((t) => t.name === "updraft_build_commit_tx")!;
     expect(await closed.handler({ round: ROUND, wallet: WALLET, amount: "1" })).toMatchObject({ ok: false, reason: "round_not_open" });
+  });
+
+  it("refuses to build a voucherless commit for a Verified round", async () => {
+    const verified = buildTools({
+      updraft: {
+        isRound: async () => true,
+        listRounds: async () => [ROUND],
+        getRound: async () => ({ ...fakeState, config: { ...fakeState.config, mode: 1 } }) as never,
+        previewCommit: async () => ({}) as never,
+        getCertificate: async () => ({}) as never,
+      },
+      factory: FACTORY,
+      analysisUrl: "x",
+      now: () => 50,
+    }).find((t) => t.name === "updraft_build_commit_tx")!;
+    expect(await verified.handler({ round: ROUND, wallet: WALLET, amount: "1" })).toMatchObject({
+      ok: false,
+      reason: "verified_round_needs_attestation",
+    });
   });
 
   it("returns the bottom-of-curve analysis", async () => {

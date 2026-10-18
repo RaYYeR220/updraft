@@ -106,6 +106,8 @@ export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch, now
         if (state.status !== 0 || t >= w.closeAt || (w.openAt !== undefined && t < w.openAt)) {
           return { ok: false, reason: "round_not_open" };
         }
+        // A Verified round needs the attestor's voucher, which only the wallet's owner can request.
+        if (state.config.mode !== 0) return { ok: false, reason: "verified_round_needs_attestation" };
         const value = BigInt(amount as string);
         return {
           transactions: [

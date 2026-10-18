@@ -11,7 +11,7 @@ import { type Deployment, createUpdraftClient, elysiumTestnet, elysiumTestnetDep
 import { buildTools } from "./tools.js";
 
 const RPC = process.env.ELYSIUM_RPC ?? "https://testnet-rpc.elysium.kinetiq.xyz";
-const API = process.env.UPDRAFT_API ?? "https://api.updraft.example";
+const API = process.env.UPDRAFT_API ?? "https://updraft-api-494617981995.us-central1.run.app";
 const deployment = (elysiumTestnetDeployment ?? JSON.parse(process.env.UPDRAFT_DEPLOYMENT ?? "null")) as Deployment | null;
 if (!deployment) throw new Error("no deployment: build the SDK after deploying, or set UPDRAFT_DEPLOYMENT");
 
