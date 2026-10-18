@@ -22,3 +22,4 @@ Thumbs.db
 # local fork deployments
 deployments/anvil*.json
 contracts/broadcast/
+services/analysis/out/cache/
