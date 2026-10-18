@@ -5,7 +5,22 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {EIP712} from "solady/utils/EIP712.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
-import {RoundConfig, Params, Wiring, Voucher, Status, AbortReason, Mode} from "./interfaces/IUpdraft.sol";
+import {LibClone} from "solady/utils/LibClone.sol";
+import {
+    RoundConfig, Params, Wiring, Voucher, Status, AbortReason, Mode, Vesting, FirePreview
+} from "./interfaces/IUpdraft.sol";
+import {IAscendLaunchpad} from "./interfaces/IAscendLaunchpad.sol";
+import {CurveLens} from "./lens/CurveLens.sol";
+import {CreatorVault} from "./CreatorVault.sol";
+import {LaunchCertificate, Certificate} from "./LaunchCertificate.sol";
+
+interface IFactoryView {
+    function isAllowedLaunchpad(address launchpad) external view returns (bool);
+}
+
+interface IStakingNotifier {
+    function notify(address asset, uint256 amount) external;
+}
 
 interface IERC20Permit {
     function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
@@ -41,6 +56,10 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     error IdentityTaken();
     error WrongRound();
     error WrongWallet();
+    error NotClosed();
+    error NotFired();
+    error NothingToClaim();
+    error TokenMismatch();
 
     event Committed(
         address indexed wallet, bytes32 indexed identityId, uint256 amount, uint256 walletTotal, uint256 roundTotal
@@ -48,6 +67,12 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     event Withdrawn(address indexed wallet, uint256 amount, uint256 paid, uint256 roundTotal);
     event Aborted(AbortReason reason, uint256 balance);
     event Refunded(address indexed wallet, uint256 amount);
+    event Shortfall(uint256 accounted, uint256 balance);
+    event Fired(
+        address indexed token, bytes32 indexed poolId, address vault, uint256 quoteUsed, uint256 tokensOut, uint256 avgPriceX96
+    );
+    event Distributed(uint256 from, uint256 to);
+    event Claimed(address indexed wallet, uint256 tokens, uint256 quote);
 
     address public factory;
     RoundConfig internal _cfg;
@@ -71,6 +96,20 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
     /// @notice Rolling hash of every accepted voucher's evidence hash, in commit order.
     bytes32 public evidenceAccumulator;
     uint32 public verifiedCount;
+
+    // Set at fire.
+    address public token;
+    bytes32 public poolId;
+    address public vault;
+    uint40 public firedAt;
+    uint256 public tokensOut;
+    uint256 public netTokens;
+    uint256 public quoteUsed;
+    uint256 public refundPool;
+    uint256 public distributedCount;
+    mapping(address => uint256) public claimedTokens;
+    mapping(address => bool) public quoteRefunded;
+    mapping(address => bool) public pushed;
 
     constructor() {
         // The implementation itself can never be initialized; clones start empty.
@@ -179,6 +218,229 @@ contract UpdraftRound is ReentrancyGuard, EIP712 {
         totalCommitted = total - amount;
         _cfg.quote.safeTransfer(msg.sender, paid);
         emit Withdrawn(msg.sender, amount, paid, totalCommitted);
+    }
+
+    // ---------------------------------------------------------------- fire
+
+    /// @notice What fire() would do right now: the batch, the fee parity, the tokens it buys.
+    function previewFire() public view returns (FirePreview memory p) {
+        uint256 balance = _quoteBalance();
+        p.usable = balance < totalCommitted ? balance : totalCommitted;
+        p.effective = p.usable < _cfg.raise.maxRaise ? p.usable : _cfg.raise.maxRaise;
+        p.parity = p.effective * _params.parityBps / 10_000;
+        p.devBuy = p.effective - p.parity;
+        (p.tokensOut,) =
+            CurveLens.preview(IAscendLaunchpad(_cfg.launchpad), _cfg.quote, expectedToken < _cfg.quote, p.devBuy);
+        p.platformTokens = p.tokensOut * _params.platformTokenBps / 10_000;
+        uint256 net = p.tokensOut - p.platformTokens;
+        if (net > 0) p.avgPriceX96 = (p.effective << 96) / net;
+    }
+
+    /// @notice Launches the token: the whole batch becomes Ascend's atomic dev-buy, so every
+    /// participant pays the same price. Anyone may call it once commits close. If Ascend's side
+    /// changed in a way the participants did not sign up for, the round aborts and refunds instead.
+    function fire() external nonReentrant {
+        if (status != Status.Live) revert NotLive();
+        if (block.timestamp < _cfg.windows.closeAt) revert NotClosed();
+        if (block.timestamp > _cfg.windows.fireBy) return _abort(AbortReason.Expired);
+
+        uint256 total = totalCommitted;
+        uint256 balance = _quoteBalance();
+        uint256 usable = balance < total ? balance : total;
+        if (usable < _cfg.raise.minRaise) return _abort(AbortReason.BelowMinimum);
+        AbortReason reason = _preflight();
+        if (reason != AbortReason.None) return _abort(reason);
+        if (usable < total) emit Shortfall(total, balance);
+
+        uint256 effective = usable < _cfg.raise.maxRaise ? usable : _cfg.raise.maxRaise;
+        uint256 parity = effective * _params.parityBps / 10_000;
+        uint256 spent = _launch(effective - parity, balance);
+
+        IAscendLaunchpad lp = IAscendLaunchpad(_cfg.launchpad);
+        if (parity > 0) {
+            _cfg.quote.safeApprove(address(lp), parity);
+            lp.fundBid(poolId, parity);
+        }
+        _installVault(lp);
+
+        uint256 out = token.balanceOf(address(this));
+        uint256 platformTokens = out * _params.platformTokenBps / 10_000;
+        if (platformTokens > 0) {
+            token.safeApprove(_wiring.staking, platformTokens);
+            IStakingNotifier(_wiring.staking).notify(token, platformTokens);
+        }
+
+        status = Status.Fired;
+        firedAt = uint40(block.timestamp);
+        tokensOut = out;
+        netTokens = out - platformTokens;
+        quoteUsed = spent + parity;
+        refundPool = usable - quoteUsed;
+        uint256 avgPriceX96 = netTokens > 0 ? (quoteUsed << 96) / netTokens : 0;
+        _certify(total - usable, platformTokens, avgPriceX96);
+        emit Fired(token, poolId, vault, quoteUsed, out, avgPriceX96);
+    }
+
+    function _preflight() internal view returns (AbortReason) {
+        IAscendLaunchpad lp = IAscendLaunchpad(_cfg.launchpad);
+        if (!IFactoryView(factory).isAllowedLaunchpad(address(lp))) return AbortReason.LaunchpadRevoked;
+        if (lp.paused()) return AbortReason.LaunchpadPaused;
+        if (!lp.quoteConfig(_cfg.quote).allowed) return AbortReason.QuoteDisallowed;
+        if (CurveLens.curveHash(lp, _cfg.quote) != curveHash) return AbortReason.CurveChanged;
+        return AbortReason.None;
+    }
+
+    /// @dev The dev-buy. The round is the creator at launch, so the tokens land here.
+    function _launch(uint256 devBuy, uint256 balanceBefore) internal returns (uint256 spent) {
+        IAscendLaunchpad lp = IAscendLaunchpad(_cfg.launchpad);
+        (uint256 expectedOut,) = CurveLens.preview(lp, _cfg.quote, expectedToken < _cfg.quote, devBuy);
+        _cfg.quote.safeApprove(address(lp), devBuy);
+        (address launched, bytes32 pid) = lp.launch(
+            IAscendLaunchpad.LaunchParams({
+                name: _cfg.name,
+                symbol: _cfg.symbol,
+                quote: _cfg.quote,
+                devBuyQuote: devBuy,
+                minDevOut: expectedOut,
+                salt: _cfg.tokenSalt,
+                creator: address(this)
+            })
+        );
+        if (launched != expectedToken) revert TokenMismatch();
+        token = launched;
+        poolId = pid;
+        spent = balanceBefore - _quoteBalance();
+    }
+
+    /// @dev Hands Ascend's creator role to a fresh policy vault in the same transaction.
+    function _installVault(IAscendLaunchpad lp) internal {
+        address v = LibClone.cloneDeterministic(_wiring.vaultImplementation, poolId);
+        CreatorVault(v).initialize(
+            CreatorVault.InitParams({
+                launchpad: address(lp),
+                poolId: poolId,
+                token: token,
+                quote: _cfg.quote,
+                creator: _cfg.creator,
+                staking: _wiring.staking,
+                policy: _cfg.policy,
+                bounds: _cfg.bounds,
+                listingCap: _cfg.listingCap,
+                exitEnabled: _cfg.exitEnabled
+            })
+        );
+        lp.transferCreator(poolId, v);
+        CreatorVault(v).acceptRole();
+        vault = v;
+    }
+
+    function _certify(uint256 shortfall, uint256 platformTokens, uint256 avgPriceX96) internal {
+        (uint32 count, uint16 top1, uint16 top10) = _concentration();
+        LaunchCertificate(_wiring.certificate).record(
+            Certificate({
+                round: address(this),
+                token: token,
+                poolId: poolId,
+                launchpad: _cfg.launchpad,
+                quote: _cfg.quote,
+                firedAt: firedAt,
+                quoteUsed: quoteUsed,
+                tokensOut: tokensOut,
+                platformTokens: platformTokens,
+                avgPriceX96: avgPriceX96,
+                participants: count,
+                verifiedIdentities: verifiedCount,
+                top1Bps: top1,
+                top10Bps: top10,
+                creatorTokens: netTokens * commitOf[_cfg.creator] / totalCommitted,
+                creatorVesting: _cfg.creatorVesting,
+                participantVesting: _cfg.participantVesting,
+                policyHash: keccak256(abi.encode(_cfg.policy, _cfg.bounds)),
+                attestor: _cfg.mode == Mode.Verified ? _cfg.attestor : address(0),
+                evidenceAccumulator: evidenceAccumulator,
+                shortfall: shortfall
+            })
+        );
+    }
+
+    /// @dev Participants with a live commit, plus the share held by the largest one and by the top ten.
+    function _concentration() internal view returns (uint32 count, uint16 top1Bps, uint16 top10Bps) {
+        uint256[10] memory top;
+        uint256 n = _participants.length;
+        for (uint256 i; i < n; i++) {
+            uint256 c = commitOf[_participants[i]];
+            if (c == 0) continue;
+            count++;
+            if (c <= top[9]) continue;
+            uint256 j = 9;
+            while (j > 0 && top[j - 1] < c) {
+                top[j] = top[j - 1];
+                j--;
+            }
+            top[j] = c;
+        }
+        uint256 sum;
+        for (uint256 k; k < 10; k++) {
+            sum += top[k];
+        }
+        top1Bps = uint16(top[0] * 10_000 / totalCommitted);
+        top10Bps = uint16(sum * 10_000 / totalCommitted);
+    }
+
+    // ---------------------------------------------------------------- distribution and claims
+
+    /// @notice Pushes every participant's unlocked tokens and quote refund. Permissionless and
+    /// chunked so any number of participants fits; the creator always claims through claim().
+    function distribute(uint256 from, uint256 to) external nonReentrant {
+        if (status != Status.Fired) revert NotFired();
+        uint256 n = _participants.length;
+        if (to > n) to = n;
+        for (uint256 i = from; i < to; i++) {
+            address w = _participants[i];
+            if (w == _cfg.creator || pushed[w] || commitOf[w] == 0) continue;
+            pushed[w] = true;
+            distributedCount++;
+            _payout(w);
+        }
+        emit Distributed(from, to);
+    }
+
+    function claim() external nonReentrant {
+        (uint256 tokens, uint256 refund) = claimable(msg.sender);
+        if (tokens == 0 && refund == 0) revert NothingToClaim();
+        _payout(msg.sender);
+    }
+
+    function claimable(address wallet) public view returns (uint256 tokens, uint256 refund) {
+        if (status != Status.Fired) return (0, 0);
+        uint256 c = commitOf[wallet];
+        if (c == 0) return (0, 0);
+        uint256 share = netTokens * c / totalCommitted;
+        Vesting memory v = wallet == _cfg.creator ? _cfg.creatorVesting : _cfg.participantVesting;
+        tokens = _vested(share, v) - claimedTokens[wallet];
+        refund = quoteRefunded[wallet] ? 0 : refundPool * c / totalCommitted;
+    }
+
+    function _payout(address wallet) internal {
+        (uint256 tokens, uint256 refund) = claimable(wallet);
+        if (tokens > 0) {
+            claimedTokens[wallet] += tokens;
+            token.safeTransfer(wallet, tokens);
+        }
+        if (!quoteRefunded[wallet]) {
+            quoteRefunded[wallet] = true;
+            if (refund > 0) _cfg.quote.safeTransfer(wallet, refund);
+        }
+        emit Claimed(wallet, tokens, refund);
+    }
+
+    function _vested(uint256 share, Vesting memory v) internal view returns (uint256) {
+        uint256 elapsed = block.timestamp - firedAt;
+        uint256 atTge = share * v.tgeBps / 10_000;
+        if (elapsed < v.cliff) return atTge;
+        uint256 sinceCliff = elapsed - v.cliff;
+        if (v.duration == 0 || sinceCliff >= v.duration) return share;
+        return atTge + (share - atTge) * sinceCliff / v.duration;
     }
 
     // ---------------------------------------------------------------- abort and refunds
