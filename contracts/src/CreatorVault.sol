@@ -12,6 +12,10 @@ interface IStakingDepositor {
     function deposit(address asset, uint256 amount) external;
 }
 
+interface IInfinityVault {
+    function getLocker() external view returns (address);
+}
+
 /// @notice Holds an Ascend launch's creator role and routes its fees by a published policy.
 /// The creator can change the split only inside bounds fixed at launch, and only after a timelock,
 /// so nobody can quietly redirect the fees to themselves overnight.
@@ -27,8 +31,9 @@ contract CreatorVault is ReentrancyGuard {
     /// @dev Bounds the quote credited per checkpoint (far above any real fee flow), so a minted
     /// testnet balance can never overflow the reward accumulator.
     uint256 internal constant MAX_QUOTE_INCOME = 1e30;
-    /// @dev Gas kept for the fee pull before a policy change or exit, so it cannot be starved.
-    uint256 internal constant PULL_GAS_FLOOR = 1_500_000;
+    /// @dev Gas every fee pull is guaranteed, so collect can't be starved into a silent skip: above
+    /// the 2M Ascend's own listing desk budgets for collect, with room for the claims and routing.
+    uint256 internal constant PULL_GAS_FLOOR = 3_000_000;
     /// @dev Gas the listing desk is guaranteed, so a refused enrollment means the desk refused it
     /// rather than ran out of gas (about 2.6 times the 287k a live enrollment takes).
     uint256 internal constant ENROLL_GAS_FLOOR = 750_000;
@@ -57,6 +62,7 @@ contract CreatorVault is ReentrancyGuard {
     error ZeroAmount();
     error OverStaked();
     error InsufficientGas();
+    error VaultLocked();
 
     event Routed(uint256 quoteIncome, uint256 tokenIncome);
     event PolicyQueued(Policy policy, uint40 eta);
@@ -155,7 +161,13 @@ contract CreatorVault is ReentrancyGuard {
     }
 
     /// @dev Each leg is claimed separately so a quote that refuses transfers cannot strand the token side.
+    /// collect is allowed to fail on its own (a paused launchpad must not freeze unstaking), but never
+    /// because the caller arranged it: not starved of gas, and not from inside a lock on Ascend's
+    /// Infinity vault, where collect always reverts. A skipped collect would let a stake, a policy
+    /// change or an exit land before fees that accrued under the old state are routed.
     function _pull() internal {
+        if (gasleft() < PULL_GAS_FLOOR) revert InsufficientGas();
+        if (IInfinityVault(launchpad.vault()).getLocker() != address(0)) revert VaultLocked();
         try launchpad.collect(poolId) {} catch {}
         try launchpad.claimToken(poolId) {} catch {}
         try launchpad.claimQuote(poolId) {} catch {}
@@ -311,7 +323,6 @@ contract CreatorVault is ReentrancyGuard {
     function executePolicy() external nonReentrant {
         if (_policyEta == 0) revert NothingQueued();
         if (block.timestamp < _policyEta) revert TooEarly();
-        if (gasleft() < PULL_GAS_FLOOR) revert InsufficientGas();
         // Fees that accrued under the old split are routed under the old split.
         _pull();
         _checkpoint();
@@ -367,7 +378,6 @@ contract CreatorVault is ReentrancyGuard {
     function executeExit() external nonReentrant {
         if (exitEta == 0) revert NothingQueued();
         if (block.timestamp < exitEta) revert TooEarly();
-        if (gasleft() < PULL_GAS_FLOOR) revert InsufficientGas();
         _pull();
         _reclaimListing();
         _checkpoint();
@@ -378,17 +388,14 @@ contract CreatorVault is ReentrancyGuard {
         emit Exited(to);
     }
 
-    /// @dev Stops the set-aside and withdraws what is not locked for a delivery, to this vault.
+    /// @dev Stops the set-aside and withdraws what is not locked for a delivery, to this vault. Either
+    /// step failing stops the exit: the role must not leave with the set-aside still attached.
     function _reclaimListing() internal {
         IListingDesk desk = IListingDesk(launchpad.listingDesk());
-        if (launchpad.listingElection(poolId) != 0) {
-            try desk.close(poolId) {} catch {}
-        }
+        if (launchpad.listingElection(poolId) != 0) desk.close(poolId);
         uint256 owed = launchpad.listingOwed(poolId);
         uint256 locked = desk.pool(poolId).locked;
-        if (owed > locked) {
-            try desk.withdraw(poolId, owed - locked) {} catch {}
-        }
+        if (owed > locked) desk.withdraw(poolId, owed - locked);
     }
 
     function queueListing(uint256 cap) external onlyCreator {

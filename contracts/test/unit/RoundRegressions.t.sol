@@ -153,16 +153,39 @@ contract RoundRegressionsTest is RoundTestBase {
     }
 
     // I9 / F06: a launch that reverts aborts the round instead of freezing it until fireBy.
-    function test_I9_launchRevert_abortsWithRefunds() public {
-        UpdraftRound r = _round(_defaultConfig());
+    // C1: a launch that reverts takes fire() down with it. A caller can make Ascend's launch revert at
+    // will (by holding the Infinity vault's lock), so a revert must never end the round. If the launch
+    // keeps failing, the fire-by deadline refunds everyone.
+    function test_C1_launchRevert_revertsFire_thenTheDeadlineRefunds() public {
+        RoundConfig memory cfg = _defaultConfig();
+        UpdraftRound r = _round(cfg);
         _commit(r, alice, 500e6);
         lp.setLaunchReverts(true);
-        vm.warp(block.timestamp + 1 hours);
+        vm.warp(cfg.windows.closeAt);
+        vm.expectRevert();
         r.fire();
-        assertEq(uint8(r.abortReason()), uint8(AbortReason.LaunchFailed));
+        assertEq(uint8(r.status()), uint8(Status.Live));
+
+        vm.warp(uint256(cfg.windows.fireBy) + 1);
+        r.fire();
+        assertEq(uint8(r.abortReason()), uint8(AbortReason.Expired));
         vm.prank(alice);
         r.refundAborted();
         assertEq(usdc.balanceOf(alice), 500e6);
+    }
+
+    // C1: fire() sent from inside someone else's Infinity lock reverts; the round stays live.
+    function test_C1_fireInsideAForeignLock_revertsAndTheRoundStaysLive() public {
+        UpdraftRound r = _round(_defaultConfig());
+        _commit(r, alice, 500e6);
+        vm.warp(block.timestamp + 1 hours);
+        lp.vault().setLocker(makeAddr("griefer"));
+        vm.expectRevert();
+        r.fire();
+        assertEq(uint8(r.status()), uint8(Status.Live));
+        lp.vault().setLocker(address(0));
+        r.fire();
+        assertEq(uint8(r.status()), uint8(Status.Fired));
     }
 
     // F16: a fire sent with too little gas for Ascend's launch reverts; it can't abort the round.
@@ -171,7 +194,7 @@ contract RoundRegressionsTest is RoundTestBase {
         _commit(r, alice, 500e6);
         lp.setLaunchGas(2_500_000);
         vm.warp(block.timestamp + 1 hours);
-        vm.expectRevert(UpdraftRound.InsufficientGas.selector);
+        vm.expectRevert();
         r.fire{gas: 2_000_000}();
         assertEq(uint8(r.status()), uint8(Status.Live));
         r.fire();

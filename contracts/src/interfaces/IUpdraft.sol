@@ -21,8 +21,7 @@ enum AbortReason {
     LaunchpadPaused,
     QuoteDisallowed,
     CurveChanged,
-    LaunchpadRevoked,
-    LaunchFailed
+    LaunchpadRevoked
 }
 
 /// @dev openAt < lockAt <= closeAt < fireBy. Withdrawals stop at lockAt, commits at closeAt.

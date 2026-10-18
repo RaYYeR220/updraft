@@ -163,6 +163,49 @@ contract VaultRegressionsTest is Test {
         assertEq(lp.poolCreator(pid), address(v));
     }
 
+    // I1: a stake sent from inside someone else's Infinity lock would skip the fee pull (Ascend's
+    // collect needs the lock) and let a just-in-time staker share fees accrued before it staked.
+    function test_I1_pullInsideAForeignLock_reverts() public {
+        (CreatorVault v, address token,) = _vault(0, false);
+        IERC20VR(token).transfer(alice, 1e18);
+        vm.startPrank(alice);
+        IERC20VR(token).approve(address(v), 1e18);
+        lp.vault().setLocker(makeAddr("griefer"));
+        vm.expectRevert(CreatorVault.VaultLocked.selector);
+        v.stake(1e18);
+        lp.vault().setLocker(address(0));
+        v.stake(1e18);
+        vm.stopPrank();
+        assertEq(v.stakeOf(alice), 1e18);
+    }
+
+    // I1: the same skip by starving collect of gas is refused too.
+    function test_I1_starvedPull_reverts() public {
+        (CreatorVault v, address token,) = _vault(0, false);
+        IERC20VR(token).transfer(alice, 1e18);
+        lp.setCollectGas(2_000_000);
+        vm.startPrank(alice);
+        IERC20VR(token).approve(address(v), 1e18);
+        vm.expectRevert(CreatorVault.InsufficientGas.selector);
+        v.stake{gas: 2_500_000}(1e18);
+        v.stake(1e18);
+        vm.stopPrank();
+        assertEq(v.stakeOf(alice), 1e18);
+    }
+
+    // I1: an exit can't complete while the listing set-aside is still live; the desk's refusal reverts it.
+    function test_I1_exitCannotSkipALiveListing() public {
+        (CreatorVault v,, bytes32 pid) = _vault(500e6, true);
+        assertGt(lp.listingElection(pid), 0);
+        vm.prank(creator);
+        v.queueExit(creator);
+        vm.warp(block.timestamp + 72 hours);
+        lp.desk().setCloseReverts(true);
+        vm.expectRevert();
+        v.executeExit();
+        assertEq(lp.poolCreator(pid), address(v), "the role stays with the vault");
+    }
+
     // F16 (vault side): accepting the role with too little gas for the desk reverts; it can't skip the listing.
     function test_F16_starvedListing_revertsInsteadOfSkipping() public {
         lp.desk().setEnrollGas(600_000);

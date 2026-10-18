@@ -52,6 +52,7 @@ interface IAscendLaunchpad {
     function paused() external view returns (bool);
     function owner() external view returns (address);
     function listingDesk() external view returns (address);
+    function vault() external view returns (address);
     function poolCreator(bytes32 poolId) external view returns (address);
     function pendingCreator(bytes32 poolId) external view returns (address);
     function creatorOwedToken(bytes32 poolId) external view returns (uint256);

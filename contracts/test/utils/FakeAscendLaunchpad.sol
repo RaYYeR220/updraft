@@ -22,6 +22,21 @@ contract GasSink {
     }
 }
 
+/// @dev Stands in for PancakeSwap Infinity's vault: one locker at a time, as the real one enforces.
+contract FakeInfinityVault {
+    error LockerAlreadySet(address locker);
+
+    address public getLocker;
+
+    function setLocker(address locker) external {
+        getLocker = locker;
+    }
+
+    function enter() external view {
+        if (getLocker != address(0)) revert LockerAlreadySet(getLocker);
+    }
+}
+
 interface IERC20Min {
     function transfer(address, uint256) external returns (bool);
     function transferFrom(address, address, uint256) external returns (bool);
@@ -60,6 +75,8 @@ contract FakeAscendLaunchpad {
     bool public quoteClaimReverts;
     bool public launchReverts;
     uint256 public launchGas;
+    uint256 public collectGas;
+    FakeInfinityVault public immutable vault = new FakeInfinityVault();
     GasSink internal immutable sink = new GasSink();
     mapping(bytes32 => uint256) public listingOwed;
 
@@ -112,6 +129,10 @@ contract FakeAscendLaunchpad {
         launchGas = amount;
     }
 
+    function setCollectGas(uint256 amount) external {
+        collectGas = amount;
+    }
+
     /// @dev Models Ascend's listing set-aside: funds the desk can pay to the creator role.
     function setListingOwed(bytes32 poolId, uint256 amount) external {
         listingOwed[poolId] = amount;
@@ -131,6 +152,7 @@ contract FakeAscendLaunchpad {
     function launch(IAscendLaunchpad.LaunchParams calldata p) external returns (address token, bytes32 poolId) {
         if (paused) revert LaunchesArePaused();
         require(!launchReverts, "launch reverts");
+        vault.enter();
         if (launchGas > 0) sink.sink(3, launchGas);
         if (p.creator == address(0)) revert ZeroCreator();
         IAscendLaunchpad.QuoteConfig memory qc = _quote[p.quote];
@@ -166,7 +188,10 @@ contract FakeAscendLaunchpad {
         bidInventory[poolId] += amount;
     }
 
-    function collect(bytes32) external pure returns (uint256) {
+    /// @dev Like Ascend's, collecting takes the Infinity vault's lock, and its swap math runs a few calls deep.
+    function collect(bytes32) external view returns (uint256) {
+        vault.enter();
+        if (collectGas > 0) sink.sink(3, collectGas);
         return 0;
     }
 
@@ -268,6 +293,7 @@ contract FakeListingDesk {
     mapping(bytes32 => uint256) public enrolledCapOf;
     bool public refuseAll;
     uint256 public enrollGas;
+    bool public closeReverts;
 
     error Refused();
 
@@ -283,6 +309,10 @@ contract FakeListingDesk {
         enrollGas = amount;
     }
 
+    function setCloseReverts(bool v) external {
+        closeReverts = v;
+    }
+
     function enroll(address token, address quote, uint256 cap) external {
         burnGas(enrollGas);
         bytes32 poolId = keccak256(abi.encode(token, quote));
@@ -294,7 +324,7 @@ contract FakeListingDesk {
     }
 
     function close(bytes32 poolId) external {
-        if (enrolledCapOf[poolId] == 0 || msg.sender != launchpad.poolCreator(poolId)) revert Refused();
+        if (closeReverts || enrolledCapOf[poolId] == 0 || msg.sender != launchpad.poolCreator(poolId)) revert Refused();
         enrolledCapOf[poolId] = 0;
     }
 

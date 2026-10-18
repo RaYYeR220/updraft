@@ -12,6 +12,7 @@ import {
     RoundConfig, Mode, Windows, Raise, Vesting, Policy, PolicyBounds, Params, Voucher
 } from "../../src/interfaces/IUpdraft.sol";
 import {AscendSwapper} from "../utils/AscendSwapper.sol";
+import {LockHolder} from "../utils/LockHolder.sol";
 import {CurveLens} from "../../src/lens/CurveLens.sol";
 import {IAscendLaunchpad} from "../../src/interfaces/IAscendLaunchpad.sol";
 import {Status, AbortReason} from "../../src/interfaces/IUpdraft.sol";
@@ -120,9 +121,9 @@ contract RoundFireForkTest is ForkBase {
         assertLt(sniperPerUsdc * 10, batchPerUsdc, "the sniper gets under a tenth of the batch's tokens per dollar");
     }
 
-    // A fire that buys out the whole live curve costs less in total than the gas the launch alone is
-    // guaranteed, so the floor never turns an honest launch into an abort.
-    function test_fork_fullCurveBuyout_fitsUnderTheLaunchGasFloor() public {
+    // The worst case for fire(): a round that buys out the whole live curve still fits comfortably in one
+    // transaction (Arbitrum Orbit caps a transaction at 32M gas).
+    function test_fork_fullCurveBuyout_firesInOneTransaction() public {
         uint256 capacity = CurveLens.capacity(IAscendLaunchpad(LAUNCHPAD), USDC, false);
         RoundConfig memory cfg = _cfg();
         cfg.raise.maxRaise = uint128(capacity);
@@ -143,7 +144,45 @@ contract RoundFireForkTest is ForkBase {
         uint256 used = before - gasleft();
         assertEq(uint8(round.abortReason()), uint8(AbortReason.None));
         assertEq(uint8(round.status()), uint8(Status.Fired));
-        assertLt(used, round.LAUNCH_GAS_FLOOR(), "the whole fire fits inside the launch's guarantee");
+        assertLt(used, 8_000_000, "a full-curve fire stays far under the per-transaction cap");
+    }
+
+    // Ascend's launch and collect both take the Infinity vault's lock, so a caller who already holds it
+    // makes them revert. That must never end a round or skip a fee pull.
+    function test_fork_fireInsideAForeignLock_revertsAndTheRoundStaysLive() public {
+        vm.prank(creator);
+        (address r,) = factory.createRound(_cfg(), bytes32(uint256(9)));
+        UpdraftRound round = UpdraftRound(r);
+        Voucher memory none;
+        _mintUsdc(wallets[0], 1_000e6);
+        vm.startPrank(wallets[0]);
+        IERC20Like(USDC).approve(r, 1_000e6);
+        round.commit(1_000e6, none, "");
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1 hours);
+
+        LockHolder griefer = new LockHolder(INFINITY_VAULT);
+        vm.expectRevert();
+        griefer.callInsideLock(r, abi.encodeCall(UpdraftRound.fire, ()));
+        assertEq(uint8(round.status()), uint8(Status.Live), "the round survives");
+
+        round.fire();
+        assertEq(uint8(round.status()), uint8(Status.Fired), "and fires for the next honest caller");
+    }
+
+    function test_fork_stakeInsideAForeignLock_reverts() public {
+        UpdraftRound round = _firedRound();
+        round.distribute(0, 5);
+        CreatorVault vault = CreatorVault(round.vault());
+        address token = round.token();
+        LockHolder staker = new LockHolder(INFINITY_VAULT);
+        vm.prank(wallets[0]);
+        IERC20Like(token).transfer(address(staker), 1e18);
+        vm.prank(address(staker));
+        IERC20Like(token).approve(address(vault), 1e18);
+
+        vm.expectRevert(CreatorVault.VaultLocked.selector);
+        staker.callInsideLock(address(vault), abi.encodeCall(CreatorVault.stake, (1e18)));
     }
 
     function test_fork_vault_harvestsLiveFees() public {
