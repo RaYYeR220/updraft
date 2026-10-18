@@ -53,7 +53,8 @@ const app = createApp({
     store,
     now: () => Date.now(),
     usdcAmount: BigInt(env("DRIP_USDC", "5000000000")),
-    gasAmount: BigInt(env("DRIP_GAS_WEI", "500000000000000")),
+    gasAmount: BigInt(env("DRIP_GAS_WEI", "200000000000000")),
+    perHour: Number(env("DRIP_PER_HOUR", "60")),
     wallet: {
       mintUsdc: (to, amount) => apiWallet.writeContract({ address: USDC, abi: mintAbi, functionName: "mint", args: [to, amount] }),
       sendGas: (to, amount) => apiWallet.sendTransaction({ to, value: amount }),

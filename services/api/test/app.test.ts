@@ -16,6 +16,7 @@ function dripDeps(store = new MemoryStore()): DripDeps & { minted: Address[] } {
     now: () => NOW,
     usdcAmount: 5_000_000_000n,
     gasAmount: 500_000_000_000_000n,
+    perHour: 20,
     wallet: {
       mintUsdc: async (to) => {
         minted.push(to);
@@ -47,7 +48,7 @@ describe("drip", () => {
     expect(sixth.body).toMatchObject({ ok: false, reason: "ip_limited" });
   });
 
-  it("caps all drips at twenty an hour, however many addresses and IPs ask", async () => {
+  it("caps all drips per hour, however many addresses and IPs ask", async () => {
     const d = dripDeps();
     for (let i = 1; i <= 20; i++) {
       const addr = `0x${i.toString(16).padStart(40, "0")}` as Address;
@@ -56,6 +57,15 @@ describe("drip", () => {
     const next = await drip(`0x${"ff".padStart(40, "0")}` as Address, "10.0.1.1", d);
     expect(next.status).toBe(429);
     expect(next.body).toMatchObject({ ok: false, reason: "busy" });
+  });
+
+  it("holds the hourly cap under concurrent requests", async () => {
+    const d = dripDeps();
+    const results = await Promise.all(
+      Array.from({ length: 25 }, (_, i) => drip(`0x${(0xe00 + i).toString(16).padStart(40, "0")}` as Address, `10.1.0.${i}`, d)),
+    );
+    expect(results.filter((r) => r.status === 200)).toHaveLength(20);
+    expect(d.minted).toHaveLength(20);
   });
 
   it("rejects a malformed address", async () => {
