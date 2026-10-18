@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createPublicClient, http } from "viem";
+import { createPublicClient } from "viem";
 import { isRehearsal, usdc } from "@/components/round/format";
 import { roundNumbers } from "@/components/round/registry";
 import { RoundCard, type Shelf, shelfOf } from "@/components/rounds/RoundCard";
-import { RPC_URL, chain } from "@/lib/config";
+import { chain, rpcTransport } from "@/lib/config";
 import { indexer } from "@/lib/data";
 import "@/styles/rounds.css";
 
@@ -54,7 +54,7 @@ export default async function RoundsPage() {
   const [rows, stats, numbers] = await Promise.all([
     indexer.rounds(),
     indexer.stats(),
-    roundNumbers(createPublicClient({ chain, transport: http(RPC_URL) })).catch(() => null),
+    roundNumbers(createPublicClient({ chain, transport: rpcTransport() })).catch(() => null),
   ]);
   const now = Math.floor(Date.now() / 1000);
   const all = rows ?? [];

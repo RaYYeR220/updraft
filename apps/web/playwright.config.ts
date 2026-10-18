@@ -4,6 +4,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e",
   timeout: 60_000,
+  // One browser at a time: the public RPC rate-limits each client, and parallel pages would trip it.
+  workers: 1,
+  expect: { timeout: 15_000 },
   retries: 0,
   reporter: "list",
   use: {

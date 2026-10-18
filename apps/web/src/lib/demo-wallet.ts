@@ -1,8 +1,8 @@
 "use client";
 
-import { type Hex, createWalletClient, http } from "viem";
+import { type Hex, createWalletClient } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { API_URL, RPC_URL, chain } from "./config";
+import { API_URL, chain, rpcTransport } from "./config";
 
 const KEY = "updraft.demo-wallet";
 
@@ -33,7 +33,7 @@ export function forgetDemoKey() {
 }
 
 export function demoWalletClient(key: Hex) {
-  return createWalletClient({ account: privateKeyToAccount(key), chain, transport: http(RPC_URL) });
+  return createWalletClient({ account: privateKeyToAccount(key), chain, transport: rpcTransport() });
 }
 
 export async function requestDrip(address: string): Promise<{ ok: boolean; reason?: string; mintTx?: string; gasTx?: string }> {

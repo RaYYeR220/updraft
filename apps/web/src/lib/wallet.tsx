@@ -1,13 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { type Address, type WalletClient, createPublicClient, http } from "viem";
+import { type Address, type WalletClient, createPublicClient } from "viem";
 import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
 import { createUpdraftClient } from "@updraft/sdk";
-import { API_URL, RPC_URL, chain, deployment } from "./config";
+import { API_URL, chain, deployment, rpcTransport } from "./config";
 import { createDemoKey, demoWalletClient, forgetDemoKey, loadDemoKey, requestDrip } from "./demo-wallet";
 
-export const publicClient = createPublicClient({ chain, transport: http(RPC_URL) });
+export const publicClient = createPublicClient({ chain, transport: rpcTransport() });
 
 type WalletKind = "injected" | "demo" | null;
 

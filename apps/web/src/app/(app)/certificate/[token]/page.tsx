@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { type Address, type Hex, createPublicClient, encodeAbiParameters, getAddress, http, isAddress, keccak256 } from "viem";
+import { type Address, type Hex, createPublicClient, encodeAbiParameters, getAddress, isAddress, keccak256 } from "viem";
 import {
   type RoundConfig,
   ascendTestnet,
@@ -27,7 +27,7 @@ import {
   vesting,
   whenFull,
 } from "@/components/round/format";
-import { API_URL, RPC_URL, chain } from "@/lib/config";
+import { API_URL, chain, rpcTransport } from "@/lib/config";
 import { indexer } from "@/lib/data";
 import "@/styles/certificate.css";
 
@@ -57,7 +57,7 @@ interface Cert {
   shortfall: bigint;
 }
 
-const client = () => createPublicClient({ chain, transport: http(RPC_URL) });
+const client = () => createPublicClient({ chain, transport: rpcTransport() });
 
 const POLICY = {
   type: "tuple",

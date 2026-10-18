@@ -1,11 +1,11 @@
-import { http, createConfig } from "wagmi";
+import { createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { RPC_URL, chain } from "./config";
+import { chain, rpcTransport } from "./config";
 
 export const wagmiConfig = createConfig({
   chains: [chain],
   connectors: [injected()],
-  transports: { [chain.id]: http(RPC_URL) },
+  transports: { [chain.id]: rpcTransport() },
   ssr: true,
 });
 

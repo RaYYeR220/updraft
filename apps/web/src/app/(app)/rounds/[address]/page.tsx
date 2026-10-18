@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { createPublicClient, getAddress, http, isAddress } from "viem";
+import { createPublicClient, getAddress, isAddress } from "viem";
 import { updraftRoundAbi } from "@updraft/sdk";
 import { RoundNotFound, RoundPage } from "@/components/round/RoundPage";
-import { RPC_URL, chain } from "@/lib/config";
+import { chain, rpcTransport } from "@/lib/config";
 import { indexer } from "@/lib/data";
 import "@/styles/round.css";
 
@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const row = await indexer.round(address);
   const named =
     row ??
-    (await createPublicClient({ chain, transport: http(RPC_URL) })
+    (await createPublicClient({ chain, transport: rpcTransport() })
       .readContract({ address: getAddress(address.toLowerCase()), abi: updraftRoundAbi, functionName: "config" })
       .catch(() => null));
   if (!named) return { title: "Round" };
