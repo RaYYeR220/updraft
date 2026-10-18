@@ -139,7 +139,7 @@ Stake $DRAFT. Rounds and vaults deposit the platform basket.
 
 | Service | Stack | Role |
 |---|---|---|
-| Indexer | Ponder 0.18, Postgres | Indexes the factory, every round (as a factory child), vaults (matched by event signature), the certificate registry, and the pool manager's swaps on Ascend pools. REST and GraphQL |
+| Indexer | Ponder 0.18, embedded PGlite (Postgres when `DATABASE_URL` is set) | Indexes the factory, every round (as a factory child), vaults (matched by event signature), the certificate registry, and the pool manager's swaps on Ascend pools. REST and GraphQL |
 | API | Hono on Node 24 | The Verified-mode attestor (below), evidence by hash, test-USDC drip, the $DRAFT epoch builder (`POST /epochs/run` behind a bearer token), `/analysis` |
 | Keeper | Node 24 | Fires at close, distributes, aborts expired rounds, harvests vaults. Spending is capped at 120 tx/hour. It backs off only after a mined revert |
 | Web | Next.js 16, React 19, wagmi 3 | Rounds, round page, studio, console, staking, certificates, docs, embed |
@@ -153,7 +153,12 @@ On Elysium, a wallet first funded by a private address that already funded anoth
 
 Every decision, approval or refusal, stores its inputs under an evidence hash. If Hyperliquid's API is unavailable, the attestor refuses. It never guesses.
 
-Hosting: Cloud Run (API, indexer, keeper) and Supabase Postgres. Secrets are only in the environment.
+Hosting:
+
+- The API, indexer and keeper run on Cloud Run.
+- The API keeps attestations, evidence and epochs in Supabase Postgres.
+- The indexer uses an embedded database. It rebuilds from the chain whenever it restarts, which takes minutes, because all of its state is derived from events.
+- Secrets are only in the environment.
 
 ## Integrator surface
 
