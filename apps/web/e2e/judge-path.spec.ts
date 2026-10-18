@@ -6,6 +6,8 @@ import { elysiumTestnet, updraftRoundAbi } from "@updraft/sdk";
 // The path a visitor takes with nothing installed, on Elysium testnet, against the live services:
 // a creator opens a two-minute round in the studio, someone else commits, the keeper fires it at T0,
 // the tokens land in the committer's wallet at the round's price, and the certificate is there.
+// E2E_CREATOR_KEY is the creator's demo-wallet key (funded with a little HYPE for gas): the app
+// labels that wallet's rounds as ours.
 const RPC = process.env.E2E_RPC ?? "https://testnet-rpc.elysium.kinetiq.xyz";
 const chain = { ...elysiumTestnet, rpcUrls: { default: { http: [RPC] } } };
 const client = createPublicClient({ chain, transport: http(RPC, { retryCount: 5, retryDelay: 1_500 }) });
@@ -17,14 +19,16 @@ async function demoAddress(page: Page): Promise<Address> {
 }
 
 test("a visitor with no wallet launches a round, another commits, both land at one price", async ({ browser }) => {
+  const creatorKey = process.env.E2E_CREATOR_KEY;
+  test.skip(!creatorKey, "set E2E_CREATOR_KEY to run against testnet");
   test.setTimeout(10 * 60_000);
   const symbol = `E${Date.now().toString(36).slice(-5).toUpperCase()}`;
 
   // The creator: a demo wallet opens a round with a one-minute lock and T0 a minute later.
-  const creator = await (await browser.newContext()).newPage();
+  const creatorContext = await browser.newContext();
+  await creatorContext.addInitScript((key) => localStorage.setItem("updraft.demo-wallet", key), creatorKey!);
+  const creator = await creatorContext.newPage();
   await creator.goto("/studio");
-  await creator.getByRole("button", { name: "Use a demo wallet" }).click();
-  await expect.poll(() => creator.evaluate(() => !!localStorage.getItem("updraft.demo-wallet")), { timeout: 30_000 }).toBe(true);
 
   await creator.locator("#sd-name").fill(`Updraft E2E ${symbol}`);
   await creator.locator("#sd-symbol").fill(symbol);

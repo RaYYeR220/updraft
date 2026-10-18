@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { isRehearsal } from "@/components/round/format";
 import { type Policy, type RoundState, creatorVaultAbi, explorerAddress, explorerTx, updraftFactoryAbi } from "@updraft/sdk";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
@@ -24,8 +25,6 @@ import { BoundsRail, SplitBar } from "./figures";
 import { fmtAmount, fmtCountdown, fmtDuration, fmtTime, pct, short, toUnits } from "./format";
 import { send, useNow, useTx } from "./tx";
 
-/** Updraft's own deployer: every round it created is a rehearsal of the full path on testnet. */
-const UPDRAFT_DEPLOYER = "0xc6d9588923181fbb84acf028a85c442421828f02";
 
 const FACTORIES = [deployment.factory as Address];
 
@@ -282,7 +281,7 @@ export function CreatorConsole({ id }: { id: string }) {
   const qa = (x: bigint) => `${fmtAmount(x, q.decimals)} ${q.symbol}`;
   const ta = (x: bigint) => `${fmtAmount(x, t.decimals)} ${t.symbol}`;
   const isCreator = !!address && address.toLowerCase() === s.config.creator.toLowerCase();
-  const rehearsal = s.config.creator.toLowerCase() === UPDRAFT_DEPLOYER;
+  const rehearsal = isRehearsal(s.config.creator);
   const status = s.status === 1 ? "Fired" : s.status === 2 ? "Aborted" : "Live";
   const clock = now ?? 0;
 

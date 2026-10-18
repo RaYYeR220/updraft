@@ -137,7 +137,7 @@ export default async function RoundsPage() {
           );
         })}
 
-      {all.some((r) => isRehearsal(r.creator, r.name)) && (
+      {all.some((r) => isRehearsal(r.creator)) && (
         <p className="cap rl-note">
           Rounds marked as rehearsals were run by the Updraft team on Elysium testnet to exercise the full path: commit, fire, land and claim.
         </p>

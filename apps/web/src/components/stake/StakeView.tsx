@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { isRehearsal } from "@/components/round/format";
 import { creatorVaultAbi, explorerAddress, explorerTx, updraftFactoryAbi, updraftRoundAbi, updraftStakingAbi } from "@updraft/sdk";
 import Link from "next/link";
 import { useState } from "react";
@@ -13,8 +14,6 @@ import { publicClient, useWallet } from "@/lib/wallet";
 
 const staking = { address: deployment.staking, abi: updraftStakingAbi } as const;
 const factory = { address: deployment.factory, abi: updraftFactoryAbi } as const;
-/** Updraft's own deployer: every round it created is a rehearsal. */
-const UPDRAFT_DEPLOYER = "0xc6d9588923181fbb84acf028a85c442421828f02";
 
 interface EpochRow {
   id: number;
@@ -105,7 +104,7 @@ async function sourcesOf(froms: Address[]) {
     const c = cfgs[i];
     if (!r || c.status !== "success") return;
     const cfg = c.result as unknown as { symbol: string; creator: Address };
-    out.set(f.toLowerCase(), { label: cfg.symbol, kind: r.kind, rehearsal: cfg.creator.toLowerCase() === UPDRAFT_DEPLOYER });
+    out.set(f.toLowerCase(), { label: cfg.symbol, kind: r.kind, rehearsal: isRehearsal(cfg.creator) });
   });
   return out;
 }

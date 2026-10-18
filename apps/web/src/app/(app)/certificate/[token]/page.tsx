@@ -171,7 +171,7 @@ export default async function CertificatePage({ params }: Props) {
   const toRound = c.tokensOut - c.platformTokens;
   const avg = priceFromX96(c.avgPriceX96);
   const verified = c.attestor !== ZERO_ADDRESS;
-  const rehearsal = config ? isRehearsal(config.creator, config.name) : row ? isRehearsal(row.creator, row.name) : false;
+  const rehearsal = config ? isRehearsal(config.creator) : row ? isRehearsal(row.creator) : false;
   const recomputed = config ? policyHashOf(config) : null;
   const matches = recomputed?.toLowerCase() === c.policyHash.toLowerCase();
   const creatorShare = toRound > 0n ? Number((c.creatorTokens * 1_000_000n) / toRound) / 10_000 : 0;

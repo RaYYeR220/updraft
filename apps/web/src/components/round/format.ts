@@ -1,9 +1,15 @@
 import { AbortReasons } from "@updraft/sdk";
 
-/** Rounds created by Updraft's own deployer, or by our end-to-end test, are rehearsals, not launches. */
-export const UPDRAFT_DEPLOYER = "0xc6d9588923181fbb84acf028a85c442421828f02";
-export const isRehearsal = (creator: string, name = "") =>
-  creator.toLowerCase() === UPDRAFT_DEPLOYER || /^Updraft E2E\b/.test(name);
+/**
+ * Wallets whose rounds are Updraft's own rehearsals, not launches: the deployer, and the creators our
+ * end-to-end test runs from. Only an address we hold marks a round as ours, never its name.
+ */
+const REHEARSAL_CREATORS = new Set([
+  "0xc6d9588923181fbb84acf028a85c442421828f02",
+  "0xe87f8fa43e2bf522365fdb0347982647f57962ac",
+  "0x34e41d7818e3478db685fa34de2e28b33b612a27",
+]);
+export const isRehearsal = (creator: string) => REHEARSAL_CREATORS.has(creator.toLowerCase());
 
 const Q96 = 2 ** 96;
 /** Raw quote (6 dp) per raw token (18 dp) to USDC per whole token. */

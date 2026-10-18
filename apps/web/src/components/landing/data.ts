@@ -1,14 +1,13 @@
 import { INDEXER_URL } from "@/lib/config";
 import { type CommitRow, type RoundRow, indexer } from "@/lib/data";
 import { headline, loadAnalysis } from "@/components/analysis/data";
+import { isRehearsal as isRehearsalCreator } from "@/components/round/format";
 
 /** The first rehearsal round's token: its certificate is the plate on the landing. */
 export const REH1_TOKEN = "0x9B63bca41cd75A4471bea8CFEad882c11f1702Bb";
 
 /** Rounds we open ourselves to rehearse launches on testnet. */
-const REHEARSAL_CREATORS = new Set(["0xc6d9588923181fbb84acf028a85c442421828f02"]);
-export const isRehearsal = (r: Pick<RoundRow, "creator" | "name">) =>
-  REHEARSAL_CREATORS.has(r.creator.toLowerCase()) || /rehearsal|sniper test|^Updraft E2E\b/i.test(r.name);
+export const isRehearsal = (r: Pick<RoundRow, "creator">) => isRehearsalCreator(r.creator);
 
 export interface ProblemFigures {
   launches: number;
