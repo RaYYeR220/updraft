@@ -11,6 +11,9 @@ import { elysiumTestnet, updraftRoundAbi } from "@updraft/sdk";
 const RPC = process.env.E2E_RPC ?? "https://testnet-rpc.elysium.kinetiq.xyz";
 const chain = { ...elysiumTestnet, rpcUrls: { default: { http: [RPC] } } };
 const client = createPublicClient({ chain, transport: http(RPC, { retryCount: 5, retryDelay: 1_500 }) });
+// The public RPC rate-limits; a failed read inside a poll just means "ask again".
+const read: typeof client.readContract = ((args: Parameters<typeof client.readContract>[0]) =>
+  client.readContract(args).catch(() => undefined)) as typeof client.readContract;
 
 async function demoAddress(page: Page): Promise<Address> {
   const key = await page.evaluate(() => localStorage.getItem("updraft.demo-wallet"));
@@ -59,14 +62,14 @@ test("a visitor with no wallet launches a round, another commits, both land at o
     .then(() => demoAddress(participant));
   await expect
     .poll(
-      async () => client.readContract({ address: "0x84Cc00D13173f7016Bbab22A736dBf75A154cFE2", abi: erc20Abi, functionName: "balanceOf", args: [wallet] }),
+      async () => read({ address: "0x84Cc00D13173f7016Bbab22A736dBf75A154cFE2", abi: erc20Abi, functionName: "balanceOf", args: [wallet] }),
       { timeout: 90_000, intervals: [3_000] },
     )
     .toBeGreaterThan(0n);
   await participant.locator("#amt").fill("250");
   await participant.getByRole("button", { name: "Commit 250 USDC" }).click();
   await expect
-    .poll(() => client.readContract({ address: round, abi: updraftRoundAbi, functionName: "commitOf", args: [wallet] }), {
+    .poll(() => read({ address: round, abi: updraftRoundAbi, functionName: "commitOf", args: [wallet] }), {
       timeout: 120_000,
       intervals: [3_000],
     })
@@ -74,7 +77,7 @@ test("a visitor with no wallet launches a round, another commits, both land at o
 
   // Nobody here sends fire(): the keeper does at T0, then pushes the tokens out.
   await expect
-    .poll(() => client.readContract({ address: round, abi: updraftRoundAbi, functionName: "status" }), {
+    .poll(() => read({ address: round, abi: updraftRoundAbi, functionName: "status" }), {
       timeout: 6 * 60_000,
       intervals: [10_000],
     })
@@ -82,7 +85,7 @@ test("a visitor with no wallet launches a round, another commits, both land at o
   const token = await client.readContract({ address: round, abi: updraftRoundAbi, functionName: "token" });
   const net = await client.readContract({ address: round, abi: updraftRoundAbi, functionName: "netTokens" });
   await expect
-    .poll(() => client.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [wallet] }), {
+    .poll(() => read({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [wallet] }), {
       timeout: 3 * 60_000,
       intervals: [10_000],
     })
