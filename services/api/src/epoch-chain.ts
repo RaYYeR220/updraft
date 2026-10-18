@@ -1,4 +1,13 @@
-import { type Address, type Hex, type PublicClient, type WalletClient, parseAbi, parseAbiItem } from "viem";
+import {
+  type Address,
+  BaseError,
+  ContractFunctionRevertedError,
+  type Hex,
+  type PublicClient,
+  type WalletClient,
+  parseAbi,
+  parseAbiItem,
+} from "viem";
 import type { EpochChain } from "./epoch-job.js";
 import type { StakeEvent } from "./epochs.js";
 
@@ -76,8 +85,11 @@ export function viemEpochChain(opts: {
     available: async (asset) => {
       try {
         return await publicClient.readContract({ address: staking, abi: stakingAbi, functionName: "available", args: [asset] });
-      } catch {
-        return 0n; // a token whose balanceOf misbehaves is skipped, never blocks the epoch
+      } catch (e) {
+        // A token whose balanceOf reverts is skipped so it cannot block every epoch; any other
+        // failure (RPC, network) aborts the job so the window stays open and is retried whole.
+        if (e instanceof BaseError && e.walk((x) => x instanceof ContractFunctionRevertedError)) return 0n;
+        throw e;
       }
     },
     nextStart: async () => {
