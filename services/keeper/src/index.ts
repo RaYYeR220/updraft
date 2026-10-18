@@ -21,6 +21,7 @@ const updraft = createUpdraftClient({ publicClient, walletClient, deployment });
 const cursors = new Map<Address, number>();
 const harvestedAt = new Map<Address, number>();
 const inFlight = new Set<string>();
+class MinedRevert extends Error {}
 const failures = new Map<Address, { count: number; until: number }>();
 
 async function snapshot(): Promise<RoundView[]> {
@@ -62,16 +63,20 @@ async function run(a: Action) {
       if (a.kind === "harvest") harvestedAt.set(a.round, Math.floor(Date.now() / 1000));
     }
     console.log(`${a.kind} ${a.round} ${receipt.status} ${hash}`);
-    if (receipt.status !== "success") throw new Error("reverted");
+    if (receipt.status !== "success") throw new MinedRevert();
     failures.delete(a.round);
   } catch (e) {
     console.error(`${a.kind} ${a.round} failed: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
     if (a.kind === "harvest") harvestedAt.set(a.round, Math.floor(Date.now() / 1000));
-    // Exponential back-off per round, so one failing round cannot eat the budget.
-    const f = failures.get(a.round) ?? { count: 0, until: 0 };
-    f.count += 1;
-    f.until = Date.now() + Math.min(3_600_000, 30_000 * 2 ** f.count);
-    failures.set(a.round, f);
+    // Back off only after a mined revert (gas actually spent), capped at ten minutes, so a failing
+    // round cannot eat the budget yet a live round is still retried well before its deadline.
+    // Simulation and RPC errors cost nothing and are simply retried next tick.
+    if (e instanceof MinedRevert) {
+      const f = failures.get(a.round) ?? { count: 0, until: 0 };
+      f.count += 1;
+      f.until = Date.now() + Math.min(600_000, 30_000 * 2 ** f.count);
+      failures.set(a.round, f);
+    }
   } finally {
     inFlight.delete(k);
   }

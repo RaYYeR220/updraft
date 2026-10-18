@@ -1,0 +1,23 @@
+{
+  "name": "@updraft/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "ponder dev",
+    "start": "ponder start",
+    "codegen": "ponder codegen",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "4.13.13",
+    "ponder": "0.18.2",
+    "viem": "2.57.7",
+    "@updraft/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "7.0.2"
+  }
+}
