@@ -56,7 +56,7 @@ export function createApp({ attestDeps, dripDeps, analysisPath, epochs }: AppDep
     // last entry is real.
     const ip = c.req.header("x-forwarded-for")?.split(",").pop()?.trim() || "unknown";
     const res = await drip(String(body.address ?? "") as Address, ip, dripDeps);
-    return c.json(res.body, res.status as 200 | 400 | 429);
+    return c.json(res.body, res.status as 200 | 400 | 429 | 503);
   });
 
   // $DRAFT basket epochs: the stored Merkle trees, so stakers can fetch their proofs.

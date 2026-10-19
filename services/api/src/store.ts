@@ -30,6 +30,8 @@ export interface Store {
   putVoucher(v: VoucherRecord): Promise<void>;
   countDrips(key: string, sinceMs: number): Promise<number>;
   putDrip(key: string, atMs: number): Promise<void>;
+  /** Removes one drip recorded at `atMs`, for a drip that was never paid. */
+  dropDrip(key: string, atMs: number): Promise<void>;
 }
 
 export class MemoryStore implements Store {
@@ -67,6 +69,10 @@ export class MemoryStore implements Store {
   }
   async putDrip(key: string, atMs: number) {
     this.drips.push({ key, at: atMs });
+  }
+  async dropDrip(key: string, atMs: number) {
+    const i = this.drips.findIndex((d) => d.key === key && d.at === atMs);
+    if (i >= 0) this.drips.splice(i, 1);
   }
 }
 
@@ -136,5 +142,8 @@ export class PgStore implements Store {
   }
   async putDrip(key: string, atMs: number) {
     await this.sql`insert into updraft.drips (key, at) values (${key}, ${atMs})`;
+  }
+  async dropDrip(key: string, atMs: number) {
+    await this.sql`delete from updraft.drips where ctid = (select ctid from updraft.drips where key = ${key} and at = ${atMs} limit 1)`;
   }
 }

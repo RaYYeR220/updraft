@@ -90,7 +90,7 @@ These also came from the pre-publication review.
 
 - **The attestor read the round's config through a hand-written ABI.** That ABI had drifted from the deployed contract, so any Verified round with a listing set-aside failed to attest. The attestor now uses the SDK's generated ABIs, and a test decodes a real encoded config.
 - **The attestor signed a voucher when the explorer was unreachable.** The sybil check silently passed. It now refuses with `unavailable`, the same way it does when Hyperliquid is down.
-- **The test-USDC drip trusted the first `X-Forwarded-For` entry, which any client can write.** It now uses the address Cloud Run appends. It also caps total drips per hour, and takes reservations one at a time on a single-instance service.
+- **The test-USDC drip trusted the first `X-Forwarded-For` entry, which any client can write.** It now uses the address Cloud Run appends. It also caps total drips per hour, and takes reservations one at a time on a single-instance service. A drip whose transfer fails gives its reservation back, so an empty funding wallet doesn't lock a visitor out for a day.
 - **The app accepted rounds in quotes other than USDC but formatted every amount as 6-decimal USDC.** The studio now creates USDC rounds only. A round in another quote shows a notice instead of a commit form.
 
 ## Known limits (not fixed)

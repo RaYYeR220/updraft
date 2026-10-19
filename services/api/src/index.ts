@@ -3,6 +3,7 @@ import postgres from "postgres";
 import { type Address, type Hex, createPublicClient, createWalletClient, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { createApp } from "./app.js";
+import { DRIP_GAS_WEI } from "./drip.js";
 import { viemEpochChain } from "./epoch-chain.js";
 import { runEpoch } from "./epoch-job.js";
 import { blockscoutExplorer, viemChainReader } from "./chain.js";
@@ -53,7 +54,7 @@ const app = createApp({
     store,
     now: () => Date.now(),
     usdcAmount: BigInt(env("DRIP_USDC", "5000000000")),
-    gasAmount: BigInt(env("DRIP_GAS_WEI", "200000000000000")),
+    gasAmount: BigInt(env("DRIP_GAS_WEI", DRIP_GAS_WEI.toString())),
     perHour: Number(env("DRIP_PER_HOUR", "60")),
     wallet: {
       mintUsdc: (to, amount) => apiWallet.writeContract({ address: USDC, abi: mintAbi, functionName: "mint", args: [to, amount] }),

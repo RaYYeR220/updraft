@@ -2,7 +2,7 @@ import { type Address, type Hex, keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { type DripDeps, drip } from "../src/drip.js";
+import { DRIP_GAS_WEI, type DripDeps, drip } from "../src/drip.js";
 import { MemoryStore } from "../src/store.js";
 
 const NOW = Date.UTC(2026, 9, 18, 12);
@@ -66,6 +66,28 @@ describe("drip", () => {
     );
     expect(results.filter((r) => r.status === 200)).toHaveLength(20);
     expect(d.minted).toHaveLength(20);
+  });
+
+  it("gives the slot back when a transfer fails, so the address can try again", async () => {
+    const d = dripDeps();
+    const send = d.wallet.sendGas;
+    d.wallet.sendGas = async () => {
+      throw new Error("insufficient funds");
+    };
+    const failed = await drip(A, "1.1.1.1", d);
+    expect(failed.status).toBe(503);
+    expect(failed.body).toMatchObject({ ok: false, reason: "funding_failed" });
+    d.wallet.sendGas = send;
+    expect((await drip(A, "1.1.1.1", d)).status).toBe(200);
+    expect(d.minted).toEqual([A]);
+  });
+
+  it("drips enough gas for a demo wallet to create a round and commit to it", () => {
+    // Measured on Elysium testnet: createRound used 1,484,348 gas and a permit commit 236,968. A
+    // wallet signs with a limit about 20% over that and a max fee of twice the 0.1 gwei base fee,
+    // and the node refuses a transaction whose limit times max fee is more than the balance.
+    const need = (((1_484_348n + 236_968n) * 12n) / 10n) * 200_000_000n;
+    expect(DRIP_GAS_WEI >= need).toBe(true);
   });
 
   it("rejects a malformed address", async () => {
