@@ -21,7 +21,7 @@ const updraft = createUpdraftClient({ publicClient, deployment });
 
 function server() {
   const s = new McpServer({ name: "updraft", version: "0.1.0" });
-  for (const tool of buildTools({ updraft, factory: deployment!.factory as Address, analysisUrl: `${API}/analysis` })) {
+  for (const tool of buildTools({ updraft, factory: deployment!.factory as Address, chainId: chain.id, analysisUrl: `${API}/analysis` })) {
     s.registerTool(tool.name, { description: tool.description, inputSchema: tool.inputSchema }, async (args: Record<string, unknown>) => {
       const result = await tool.handler(args);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };

@@ -5,6 +5,7 @@ import {
   type PublicClient,
   type WalletClient,
   concat,
+  domainSeparator,
   encodeAbiParameters,
   erc20Abi,
   getContractAddress,
@@ -46,7 +47,25 @@ export interface UpdraftClientOptions {
 
 const permitAbi = [
   { type: "function", name: "nonces", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "version", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { type: "function", name: "DOMAIN_SEPARATOR", stateMutability: "view", inputs: [], outputs: [{ type: "bytes32" }] },
 ] as const;
+
+/**
+ * The EIP-2612 domain version a token signs with. Mainnet USDC says "2" through `version()`; tokens
+ * without that view (Ascend's testnet Mock USDC) are matched against their own DOMAIN_SEPARATOR.
+ */
+export async function permitVersion(client: PublicClient, token: Address, name: string, chainId: number): Promise<string> {
+  const [own, separator] = await Promise.all([
+    client.readContract({ address: token, abi: permitAbi, functionName: "version" }).catch(() => null),
+    client.readContract({ address: token, abi: permitAbi, functionName: "DOMAIN_SEPARATOR" }).catch(() => null),
+  ]);
+  if (own) return own;
+  for (const version of ["1", "2"]) {
+    if (separator === domainSeparator({ domain: { name, version, chainId, verifyingContract: token } })) return version;
+  }
+  return "1";
+}
 
 /** Where Ascend will deploy a round's token, computed offline (CREATE2 salted by the round). */
 export function predictToken(args: {
@@ -190,9 +209,11 @@ export function createUpdraftClient({ publicClient, walletClient, deployment, ap
       publicClient.readContract({ address: quote, abi: permitAbi, functionName: "nonces", args: [w.account.address] }),
     ]);
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+    const chainId = await publicClient.getChainId();
+    const version = await permitVersion(publicClient, quote, name, chainId);
     const signature = await w.signTypedData({
       account: w.account,
-      domain: { name, version: "1", chainId: await publicClient.getChainId(), verifyingContract: quote },
+      domain: { name, version, chainId, verifyingContract: quote },
       types: {
         Permit: [
           { name: "owner", type: "address" },
@@ -240,6 +261,8 @@ export function createUpdraftClient({ publicClient, walletClient, deployment, ap
     predictRound: (roundSalt: Hex, deployer: Address) =>
       publicClient.readContract({ ...factory, functionName: "predictRound", args: [roundSalt, deployer] }),
     isRound: (address: Address) => publicClient.readContract({ ...factory, functionName: "isRound", args: [address] }),
+    commitOf: (address: Address, wallet: Address) =>
+      publicClient.readContract({ ...round(address), functionName: "commitOf", args: [wallet] }) as Promise<bigint>,
     getRound,
     listRounds,
     previewFire: (address: Address) =>

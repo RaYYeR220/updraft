@@ -3,8 +3,10 @@ import { z } from "zod";
 import { EMPTY_VOUCHER, type RoundConfig, type UpdraftClient, updraftFactoryAbi, updraftRoundAbi } from "@updraft/sdk";
 
 export interface ToolDeps {
-  updraft: Pick<UpdraftClient, "isRound" | "listRounds" | "getRound" | "previewCommit" | "getCertificate">;
+  updraft: Pick<UpdraftClient, "isRound" | "listRounds" | "getRound" | "previewCommit" | "getCertificate" | "commitOf">;
   factory: Address;
+  /** Stamped on every built transaction, so a wallet signs it for the right chain. */
+  chainId: number;
   analysisUrl: string;
   fetchFn?: typeof fetch;
   now?: () => number;
@@ -49,7 +51,8 @@ const roundConfig = z.object({
 
 const NOT_A_ROUND = { ok: false, reason: "not_an_updraft_round" } as const;
 
-export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch, now = () => Math.floor(Date.now() / 1000) }: ToolDeps): Tool[] {
+export function buildTools({ updraft, factory, chainId, analysisUrl, fetchFn = fetch, now = () => Math.floor(Date.now() / 1000) }: ToolDeps): Tool[] {
+  const tx = (to: string, data: Hex, description: string, from?: string) => ({ ...(from ? { from } : {}), to, data, value: "0", chainId, description });
   // Every tool that takes a round first checks the factory created it: an arbitrary contract could
   // otherwise impersonate a round and steer an approval to itself.
   const known = (round: unknown) => updraft.isRound(round as Address);
@@ -109,20 +112,30 @@ export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch, now
         // A Verified round needs the attestor's voucher, which only the wallet's owner can request.
         if (state.config.mode !== 0) return { ok: false, reason: "verified_round_needs_attestation" };
         const value = BigInt(amount as string);
+        // The same checks commit() makes, so an agent hears why before it pays gas for a revert.
+        const r = state.config.raise;
+        if (value < r.minCommit || value === 0n) return { ok: false, reason: "below_min_commit", minCommit: r.minCommit.toString() };
+        if (state.preview.usable < state.totalCommitted) return { ok: false, reason: "escrow_short" };
+        const isCreator = (wallet as string).toLowerCase() === state.config.creator.toLowerCase();
+        const cap = isCreator ? r.creatorCap : r.walletCap;
+        const already = await updraft.commitOf(round as Address, wallet as Address);
+        if (already + value > cap) {
+          return { ok: false, reason: isCreator ? "over_creator_cap" : "over_wallet_cap", room: (cap > already ? cap - already : 0n).toString() };
+        }
         return {
           transactions: [
-            {
-              from: wallet,
-              to: state.config.quote,
-              data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [round as Address, value] }),
-              description: `approve ${value} of the quote to the round`,
-            },
-            {
-              from: wallet,
-              to: round,
-              data: encodeFunctionData({ abi: updraftRoundAbi, functionName: "commit", args: [value, EMPTY_VOUCHER, "0x"] }),
-              description: `commit ${value} into the round`,
-            },
+            tx(
+              state.config.quote,
+              encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [round as Address, value] }),
+              `approve ${value} of the quote to the round`,
+              wallet as string,
+            ),
+            tx(
+              round as string,
+              encodeFunctionData({ abi: updraftRoundAbi, functionName: "commit", args: [value, EMPTY_VOUCHER, "0x"] }),
+              `commit ${value} into the round`,
+              wallet as string,
+            ),
           ],
         };
       },
@@ -151,11 +164,11 @@ export function buildTools({ updraft, factory, analysisUrl, fetchFn = fetch, now
           listingCap: BigInt(c.listingCap),
         };
         return {
-          transaction: {
-            to: factory,
-            data: encodeFunctionData({ abi: updraftFactoryAbi, functionName: "createRound", args: [cfg, roundSalt as Hex] }),
-            description: `create round ${c.name} (${c.symbol})`,
-          },
+          transaction: tx(
+            factory,
+            encodeFunctionData({ abi: updraftFactoryAbi, functionName: "createRound", args: [cfg, roundSalt as Hex] }),
+            `create round ${c.name} (${c.symbol})`,
+          ),
         };
       },
     },

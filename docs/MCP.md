@@ -14,7 +14,7 @@
 | `updraft_build_commit_tx` | Unsigned `approve` and `commit` transactions for an Open round |
 | `updraft_build_create_round_tx` | An unsigned `createRound` transaction |
 
-Before a round tool does anything, it checks that the address is a round the factory created. A look-alike contract gets `not_an_updraft_round`. The commit builder also checks that the round is live, inside its commit window, and in Open mode. A Verified round needs a voucher that only the wallet's owner can request. It doesn't check the amount against the round's caps; the contract does that, and refuses with a named error.
+Before a round tool does anything, it checks that the address is a round the factory created. A look-alike contract gets `not_an_updraft_round`. The commit builder also checks that the round is live, inside its commit window, and in Open mode. A Verified round needs a voucher that only the wallet's owner can request. It then makes the same amount checks `commit()` makes: the round's minimum commit, the wallet's cap (the creator's cap for the creator), and an escrow that holds what was committed. A refusal names the limit and, for a cap, how much room is left. Every built transaction carries `chainId` and a zero `value`, so a wallet can sign it as it comes.
 
 ## Hosted
 

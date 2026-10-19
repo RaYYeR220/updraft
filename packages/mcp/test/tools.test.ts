@@ -7,6 +7,8 @@ const ROUND = "0x1111111111111111111111111111111111111111" as Address;
 const USDC = "0x84Cc00D13173f7016Bbab22A736dBf75A154cFE2" as Address;
 const WALLET = "0x2222222222222222222222222222222222222222" as Address;
 const FACTORY = "0x3333333333333333333333333333333333333333" as Address;
+const CREATOR = "0x5555555555555555555555555555555555555555" as Address;
+const CHAIN = 99801;
 
 const fakeState = {
   address: ROUND,
@@ -16,9 +18,20 @@ const fakeState = {
   totalCommitted: 1_000_000_000n,
   participantCount: 3,
   verifiedCount: 0,
-  config: { quote: USDC, name: "Test", symbol: "TST", mode: 0, windows: { closeAt: 100 }, raise: { maxRaise: 5n } },
-  preview: { usable: 1n, effective: 1n, parity: 0n, devBuy: 1n, tokensOut: 10n, platformTokens: 0n, avgPriceX96: 7n },
+  config: {
+    quote: USDC,
+    name: "Test",
+    symbol: "TST",
+    mode: 0,
+    creator: CREATOR,
+    windows: { closeAt: 100 },
+    raise: { maxRaise: 50_000_000_000n, walletCap: 5_000_000_000n, creatorCap: 1_000_000_000n, minCommit: 10_000_000n },
+  },
+  preview: { usable: 1_000_000_000n, effective: 1n, parity: 0n, devBuy: 1n, tokensOut: 10n, platformTokens: 0n, avgPriceX96: 7n },
 };
+
+/** What each wallet already has in the round. */
+const committed: Record<string, bigint> = { [WALLET]: 0n, [CREATOR]: 0n };
 
 const tools = buildTools({
   updraft: {
@@ -27,8 +40,10 @@ const tools = buildTools({
     getRound: async () => fakeState as never,
     previewCommit: async (_r: Address, extra: bigint) => ({ effective: extra, tokensOut: 99n, netTokens: 98n, avgPriceX96: 5n }),
     getCertificate: async () => ({ participants: 12, top10Bps: 4100 }) as never,
+    commitOf: async (_r: Address, w: Address) => committed[w] ?? 0n,
   },
   factory: FACTORY,
+  chainId: CHAIN,
   analysisUrl: "https://api.example/analysis",
   fetchFn: async () => new Response(JSON.stringify({ summary: { launches: 251 } })),
   now: () => 50,
@@ -78,6 +93,51 @@ describe("mcp tools", () => {
     expect(out.transactions[1].from).toBe(WALLET);
   });
 
+  it("gives every built transaction the chain id and a zero value, so a wallet can sign it as is", async () => {
+    const out = (await tool("updraft_build_commit_tx").handler({ round: ROUND, wallet: WALLET, amount: "500000000" })) as {
+      transactions: { chainId: number; value: string }[];
+    };
+    for (const t of out.transactions) expect(t).toMatchObject({ chainId: CHAIN, value: "0" });
+  });
+
+  it("refuses a commit under the round's minimum", async () => {
+    const out = await tool("updraft_build_commit_tx").handler({ round: ROUND, wallet: WALLET, amount: "9999999" });
+    expect(out).toMatchObject({ ok: false, reason: "below_min_commit", minCommit: "10000000" });
+  });
+
+  it("refuses a commit over the wallet cap, and says how much room is left", async () => {
+    committed[WALLET] = 4_800_000_000n;
+    try {
+      const out = await tool("updraft_build_commit_tx").handler({ round: ROUND, wallet: WALLET, amount: "500000000" });
+      expect(out).toMatchObject({ ok: false, reason: "over_wallet_cap", room: "200000000" });
+    } finally {
+      committed[WALLET] = 0n;
+    }
+  });
+
+  it("holds the creator to the creator cap", async () => {
+    const out = await tool("updraft_build_commit_tx").handler({ round: ROUND, wallet: CREATOR, amount: "2000000000" });
+    expect(out).toMatchObject({ ok: false, reason: "over_creator_cap", room: "1000000000" });
+  });
+
+  it("refuses a commit while the escrow holds less than was committed", async () => {
+    const short = buildTools({
+      updraft: {
+        isRound: async () => true,
+        listRounds: async () => [ROUND],
+        getRound: async () => ({ ...fakeState, preview: { ...fakeState.preview, usable: 999_999_999n } }) as never,
+        previewCommit: async () => ({}) as never,
+        getCertificate: async () => ({}) as never,
+        commitOf: async () => 0n,
+      },
+      factory: FACTORY,
+      chainId: CHAIN,
+      analysisUrl: "x",
+      now: () => 50,
+    }).find((t) => t.name === "updraft_build_commit_tx")!;
+    expect(await short.handler({ round: ROUND, wallet: WALLET, amount: "500000000" })).toMatchObject({ ok: false, reason: "escrow_short" });
+  });
+
   it("builds an unsigned createRound transaction from JSON config", async () => {
     const config = {
       launchpad: "0x6d01f6644bbf1b5074472D3e85aa1465B4d2bF3d",
@@ -105,6 +165,7 @@ describe("mcp tools", () => {
       transaction: { to: Address; data: `0x${string}` };
     };
     expect(out.transaction.to).toBe(FACTORY);
+    expect(out.transaction).toMatchObject({ chainId: CHAIN, value: "0" });
     const decoded = decodeFunctionData({ abi: updraftFactoryAbi, data: out.transaction.data });
     expect(decoded.functionName).toBe("createRound");
     expect((decoded.args[0] as { raise: { maxRaise: bigint } }).raise.maxRaise).toBe(50_000_000_000n);
@@ -125,8 +186,10 @@ describe("mcp tools", () => {
         getRound: async () => ({ ...fakeState, status: 1 }) as never,
         previewCommit: async () => ({}) as never,
         getCertificate: async () => ({}) as never,
+        commitOf: async () => 0n,
       },
       factory: FACTORY,
+      chainId: CHAIN,
       analysisUrl: "x",
       now: () => 50,
     }).find((t) => t.name === "updraft_build_commit_tx")!;
@@ -141,8 +204,10 @@ describe("mcp tools", () => {
         getRound: async () => ({ ...fakeState, config: { ...fakeState.config, mode: 1 } }) as never,
         previewCommit: async () => ({}) as never,
         getCertificate: async () => ({}) as never,
+        commitOf: async () => 0n,
       },
       factory: FACTORY,
+      chainId: CHAIN,
       analysisUrl: "x",
       now: () => 50,
     }).find((t) => t.name === "updraft_build_commit_tx")!;
