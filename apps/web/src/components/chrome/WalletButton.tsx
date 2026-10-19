@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useWallet } from "@/lib/wallet";
+import { dripWords } from "@/lib/demo-wallet";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -10,6 +11,8 @@ export function WalletButton() {
   const { address, kind, connectInjected, startDemo, disconnect, wrongNetwork, switchNetwork } = useWallet();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // This browser holds the demo wallet's only key, so forgetting it takes a second click.
+  const [confirming, setConfirming] = useState(false);
 
   if (address && wrongNetwork) {
     return (
@@ -22,7 +25,15 @@ export function WalletButton() {
   if (address) {
     return (
       <>
-        <button type="button" className="wallet" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <button
+          type="button"
+          className="wallet"
+          onClick={() => {
+            setOpen((o) => !o);
+            setConfirming(false);
+          }}
+          aria-expanded={open}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="11" fill="#c7d83b" />
             <path d="M5 13 L10 9 L12 11.2 L14 9 L19 13 L14 11.2 L12 14.2 L10 11.2 Z" fill="#231e19" />
@@ -35,14 +46,19 @@ export function WalletButton() {
             <button type="button" onClick={() => navigator.clipboard?.writeText(address)}>
               Copy address
             </button>
+            {confirming && (
+              <p className="note">This browser holds the only copy of the key. Tokens from rounds it joined stay on an address no one can open.</p>
+            )}
             <button
               type="button"
               onClick={() => {
+                if (kind === "demo" && !confirming) return setConfirming(true);
                 disconnect();
                 setOpen(false);
+                setConfirming(false);
               }}
             >
-              {kind === "demo" ? "Forget demo wallet" : "Disconnect"}
+              {kind !== "demo" ? "Disconnect" : confirming ? "Forget it for good" : "Forget demo wallet"}
             </button>
           </div>
         )}
@@ -71,7 +87,7 @@ export function WalletButton() {
             onClick={async () => {
               setNote("Funding a demo wallet with test USDC…");
               const res = await startDemo();
-              setNote(res.ok ? "Ready: 5,000 test USDC and gas." : `Demo funds unavailable (${res.reason}).`);
+              setNote(res.ok ? "Ready: 5,000 test USDC and gas." : dripWords(res.reason));
             }}
           >
             Try with a demo wallet<small>&nbsp;no install</small>

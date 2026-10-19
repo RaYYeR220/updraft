@@ -105,12 +105,12 @@ Script: `services/keeper/scripts/refusals.ts`.
 | Suite | Count | Command |
 |---|---|---|
 | Contracts: unit, invariant, and fork against the live launchpad at a pinned block | 142 | `cd contracts && forge test` |
-| API: attestor, Hyperliquid rules, evidence, epochs, drip | 32 | `pnpm --filter @updraft/api test` |
+| API: attestor, Hyperliquid rules, evidence, epochs, drip | 34 | `pnpm --filter @updraft/api test` |
 | Keeper | 10 | `pnpm --filter @updraft/keeper test` |
-| MCP | 9 | `pnpm --filter @updraft/mcp test` |
+| MCP | 14 | `pnpm --filter @updraft/mcp test` |
 | Analysis | 4 | `pnpm --filter @updraft/analysis test` |
 | Widget | 4 | `pnpm --filter @updraft/widget test` |
-| SDK, end to end on an anvil fork of Elysium with the real deploy script | 2 | `pnpm --filter @updraft/sdk test` |
+| SDK: permit domains, plus end to end on an anvil fork of Elysium with the real deploy script | 5 | `pnpm --filter @updraft/sdk test` |
 | Web, against the live app: every page on desktop and mobile, plus the full visitor path below | 19 | `pnpm --filter @updraft/web test:e2e` |
 
 The visitor path (`apps/web/e2e/judge-path.spec.ts`) uses no wallet and no setup, and nothing is mocked. It runs against the deployed app and Elysium testnet in about three minutes:

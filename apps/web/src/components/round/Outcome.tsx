@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { Address, Hash } from "viem";
 import { type RoundState, explorerAddress, explorerTx, updraftRoundAbi } from "@updraft/sdk";
 import type { RoundRow } from "@/lib/data";
@@ -52,7 +53,9 @@ export function tradesAfterFire(swaps: SwapRow[], tokenIs0: boolean, firedAt: nu
 export function ReadyPanel({ state, phase, position, run, tx, ctx }: { state: RoundState; phase: "ready" | "overdue"; position: Position | undefined; run: Run; tx: TxState | null; ctx: ErrorContext }) {
   const { updraft, address } = useWallet();
   const r = state.config.raise;
-  const under = state.totalCommitted < r.minRaise;
+  // fire() measures the escrow it actually holds, not what was committed.
+  const held = state.preview.usable;
+  const under = held < r.minRaise;
   const busy = tx?.phase === "signing" || tx?.phase === "pending";
   const fire = () =>
     run(under ? "Close the round" : "Fire the round", () => updraft.fire(state.address), { ctx, done: () => fireOutcome(state.address) });
@@ -63,7 +66,7 @@ export function ReadyPanel({ state, phase, position, run, tx, ctx }: { state: Ro
       {phase === "ready" ? (
         <p className="sub">
           {under
-            ? `Commits are closed and the round holds ${usdc(state.totalCommitted)} USDC, under its minimum of ${usdc(r.minRaise)}. Sending the transaction closes it, and everyone can take a full refund.`
+            ? `Commits are closed and the round holds ${usdc(held)} USDC, under its minimum of ${usdc(r.minRaise)}. Sending the transaction closes it, and everyone can take a full refund.`
             : `Commits are closed. One transaction turns the pot into Ascend's launch buy. Anyone can send it; it costs only gas. If nobody does by ${when(state.config.windows.fireBy)}, everyone is refunded.`}
         </p>
       ) : (
@@ -126,6 +129,8 @@ export function AbortedPanel({ state, position, run, tx, ctx }: { state: RoundSt
   );
 }
 
+const PUSH_SLICE = 150;
+
 export function YourTokensPanel({
   state,
   position,
@@ -150,6 +155,9 @@ export function YourTokensPanel({
   const creatorIn = participants.some((p) => same(p.wallet, state.config.creator));
   const pushTo = Math.max(0, state.participantCount - (creatorIn ? 1 : 0));
   const pushed = Math.min(f.distributedCount, pushTo);
+  // A big round is pushed a slice per transaction, so no single push outgrows a block.
+  const [cursor, setCursor] = useState(0);
+  const sliceEnd = Math.min(state.participantCount, cursor + PUSH_SLICE);
   const c = position?.committed ?? 0n;
   const share = state.totalCommitted > 0n ? (f.netTokens * c) / state.totalCommitted : 0n;
   const isCreator = same(address, state.config.creator);
@@ -240,14 +248,18 @@ export function YourTokensPanel({
             type="button"
             className="ghost"
             disabled={busy}
-            onClick={() =>
-              run("Push tokens", () => updraft.distribute(state.address, 0n, BigInt(state.participantCount)), {
+            onClick={async () => {
+              const ok = await run("Push tokens", () => updraft.distribute(state.address, BigInt(cursor), BigInt(sliceEnd)), {
                 ctx,
-                done: "Pushed. Every unlocked share is on its way to its wallet.",
-              })
-            }
+                done:
+                  sliceEnd < state.participantCount
+                    ? `Pushed wallets ${cursor + 1} to ${sliceEnd}. Send the next slice for the rest.`
+                    : "Pushed. Every unlocked share is on its way to its wallet.",
+              });
+              if (ok) setCursor(sliceEnd < state.participantCount ? sliceEnd : 0);
+            }}
           >
-            Push the rest now
+            {state.participantCount > PUSH_SLICE ? `Push wallets ${cursor + 1} to ${sliceEnd}` : "Push the rest now"}
           </button>
         )}
         <p className="fine">Unlocked tokens and any oversubscription refund are pushed to every wallet; the creator claims their own.</p>

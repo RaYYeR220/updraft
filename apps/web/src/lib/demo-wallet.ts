@@ -37,10 +37,30 @@ export function demoWalletClient(key: Hex) {
 }
 
 export async function requestDrip(address: string): Promise<{ ok: boolean; reason?: string; mintTx?: string; gasTx?: string }> {
-  const res = await fetch(`${API_URL}/drip`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ address }),
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/drip`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
+
+/** What to tell the visitor when the drip refuses. */
+export function dripWords(reason: string | undefined): string {
+  switch (reason) {
+    case "address_limited":
+      return "This demo wallet was already funded today.";
+    case "ip_limited":
+      return "Too many demo wallets from this network in the last hour. Try again later.";
+    case "busy":
+      return "The test faucet is busy. Try again in a few minutes.";
+    case "funding_failed":
+      return "The test faucet couldn't send funds just now. Try again in a minute.";
+    default:
+      return "The test faucet is unreachable. Try again in a minute.";
+  }
 }

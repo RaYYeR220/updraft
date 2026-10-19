@@ -59,6 +59,11 @@ const REASONS: Record<string, string> = {
   BadProof: "The proof doesn't match the posted epoch root.",
 };
 
+// Every Updraft revert names its error, so a bare one is the node refusing a gas limit the
+// wallet's HYPE can't cover.
+const BARE_REVERT = "The node refused it without a reason, which here almost always means the wallet's HYPE can't cover this call's gas. Top up the wallet and try again.";
+const bare = (r: ContractFunctionRevertedError) => !r.signature && (!r.reason || /^execution reverted\.?$/i.test(r.reason));
+
 export function explain(e: unknown): string {
   if (e instanceof BaseError) {
     if (e.walk((x) => x instanceof UserRejectedRequestError)) return "You declined the request in your wallet.";
@@ -67,6 +72,7 @@ export function explain(e: unknown): string {
       const name = revert.data?.errorName;
       if (name && REASONS[name]) return REASONS[name];
       if (name) return `The contract refused the call (${name}).`;
+      if (bare(revert)) return BARE_REVERT;
       if (revert.reason) return `The contract refused the call: ${revert.reason}.`;
     }
     return e.shortMessage;

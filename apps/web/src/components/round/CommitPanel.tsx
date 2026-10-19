@@ -4,6 +4,7 @@ import { useState } from "react";
 import { type Address, parseUnits } from "viem";
 import type { Attestation, RoundState } from "@updraft/sdk";
 import { useWallet } from "@/lib/wallet";
+import { dripWords } from "@/lib/demo-wallet";
 import type { ErrorContext } from "./errors";
 import { type Phase, price, same, tokens, usdc, when } from "./format";
 import type { Batch, Position, RoundParams, TxState } from "./hooks";
@@ -106,6 +107,10 @@ export function CommitPanel({
   const quick = [25n, 100n, 250n, 1000n].map((n) => n * 1_000_000n).filter((n) => n >= r.minCommit && n <= room);
   const max = mode === "commit" ? (position && position.balance < room ? position.balance : room) : committed;
 
+  // The contract pays a withdrawal pro-rata when the escrow is short (someone burned from it).
+  const paidOut = (a: bigint) =>
+    state.preview.usable < state.totalCommitted ? (a * state.preview.usable) / state.totalCommitted : a;
+
   const submit = async () => {
     if (!amount || problem) return;
     const label = mode === "commit" ? `Commit ${usdc(amount)} USDC` : `Withdraw ${usdc(amount)} USDC`;
@@ -117,7 +122,10 @@ export function CommitPanel({
           })
         : await run(label, () => updraft.withdraw(state.address, amount), {
             ctx,
-            done: `Withdrew ${usdc(amount)} USDC. It's back in your wallet.`,
+            done:
+              paidOut(amount) === amount
+                ? `Withdrew ${usdc(amount)} USDC. It's back in your wallet.`
+                : `Withdrew ${usdc(amount)} USDC of your commit and received ${usdc(paidOut(amount))}: the escrow holds less than was committed, so every withdrawal takes the same cut.`,
           });
     if (ok) setText("");
   };
@@ -258,7 +266,7 @@ export function CommitPanel({
             onClick={async () => {
               setDemoNote("Funding a demo wallet with test USDC…");
               const res = await startDemo();
-              setDemoNote(res.ok ? "Ready: test USDC and gas are on their way." : `Demo funds unavailable (${res.reason}).`);
+              setDemoNote(res.ok ? "Ready: test USDC and gas are on their way." : dripWords(res.reason));
             }}
           >
             Try with a demo wallet

@@ -78,6 +78,11 @@ function sentence(name: string, c: ErrorContext): string {
   }
 }
 
+// Every Updraft revert names its error, so a bare one is the node refusing a gas limit the
+// wallet's HYPE can't cover.
+const BARE_REVERT = "The node refused it without a reason, which here almost always means the wallet's HYPE can't cover this call's gas. Top up the wallet and try again.";
+const bare = (r: ContractFunctionRevertedError) => !r.signature && (!r.reason || /^execution reverted\.?$/i.test(r.reason));
+
 /** Turns a failed write into one plain sentence. */
 export function explain(e: unknown, c: ErrorContext = {}): string {
   if (e instanceof BaseError) {
@@ -86,6 +91,7 @@ export function explain(e: unknown, c: ErrorContext = {}): string {
     if (revert instanceof ContractFunctionRevertedError) {
       const name = revert.data?.errorName ?? (revert.signature ? SELECTORS[revert.signature] : undefined);
       if (name) return sentence(name, c);
+      if (bare(revert)) return BARE_REVERT;
       if (revert.reason) return `The transaction would revert: ${revert.reason}.`;
     }
     const text = `${e.shortMessage} ${e.details ?? ""}`;
