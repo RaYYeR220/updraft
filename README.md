@@ -7,6 +7,7 @@ On a bonding-curve launchpad the bottom of the curve goes to whoever is there fi
 Updraft runs on Elysium testnet (chain 99801) against the real Ascend launchpad. It uses no mocks of Ascend.
 
 - **App:** https://updraft-weld.vercel.app
+- **Demo video (2 min):** https://youtu.be/IX1rWygDzwA
 - **API:** https://updraft-api-494617981995.us-central1.run.app
 - **Indexer:** https://updraft-indexer-494617981995.us-central1.run.app
 - **MCP server (Streamable HTTP):** https://updraft-mcp-494617981995.us-central1.run.app/mcp
