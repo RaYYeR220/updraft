@@ -25,6 +25,12 @@ for (const [path, heading] of pages) {
   });
 }
 
+test("the stake page shows what everyone has staked without a wallet", async ({ page }) => {
+  await page.goto("/stake");
+  const total = page.locator("dt", { hasText: "Staked by everyone" }).locator("xpath=following-sibling::dd");
+  await expect(total).toHaveText(/\d.* DRAFT$/, { timeout: 30_000 });
+});
+
 test("the sniper comparison is read from the chain", async ({ page }) => {
   await page.goto("/rounds/0x15f436B0D9A917179Fc5DD390072AD46Ed7aC03b");
   await expect(page.getByText(/5\.13× fewer tokens per USDC/)).toBeVisible({ timeout: 30_000 });

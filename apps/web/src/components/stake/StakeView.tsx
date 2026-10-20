@@ -128,7 +128,8 @@ export function StakeView() {
           { address: deployment.factory, abi: updraftFactoryAbi, functionName: "params" },
         ],
       });
-      return { stakeToken, totalStaked, epochCount: Number(epochCount), params };
+      const token = stakeToken === zeroAddress ? null : ((await metaOf([stakeToken])).get(stakeToken.toLowerCase()) ?? null);
+      return { stakeToken, totalStaked, epochCount: Number(epochCount), params, token };
     },
     refetchInterval: 15_000,
   });
@@ -306,7 +307,7 @@ export function StakeView() {
                   </div>
                   <div>
                     <dt>Staked by everyone</dt>
-                    <dd>{m ? `${fmtAmount(chain.data.totalStaked, m.decimals)} ${m.symbol}` : "–"}</dd>
+                    <dd>{chain.data.token ? `${fmtAmount(chain.data.totalStaked, chain.data.token.decimals)} ${chain.data.token.symbol}` : "–"}</dd>
                   </div>
                 </dl>
                 {m && (
