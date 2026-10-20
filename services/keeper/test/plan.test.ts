@@ -43,9 +43,12 @@ describe("keeper plan", () => {
     expect(plan([{ ...base }], 1000, new Set([`fire:${R(1)}`]))).toEqual([]);
   });
 
-  it("ignores rounds nobody committed to (no gas spent on empty or spam rounds)", () => {
-    expect(plan([{ ...base, totalCommitted: 0n }], 1000, new Set())).toEqual([]);
-    expect(plan([{ ...base, totalCommitted: 0n }], 2001, new Set())).toEqual([]);
+  it("closes a round nobody joined once commits close, so it doesn't sit live forever", () => {
+    // An abort costs a few percent of what creating the round did, so this can't be farmed cheaply.
+    const empty = { ...base, totalCommitted: 0n };
+    expect(plan([empty], 999, new Set())).toEqual([]);
+    expect(plan([empty], 1000, new Set())).toEqual([{ kind: "abort", round: R(1) }]);
+    expect(plan([empty], 2001, new Set())).toEqual([{ kind: "abort", round: R(1) }]);
   });
 
   it("caps the actions it takes per pass", () => {

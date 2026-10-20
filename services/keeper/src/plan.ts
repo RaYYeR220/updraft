@@ -38,12 +38,11 @@ export function plan(
   const ordered = [...rounds].sort((a, b) => (a.status - b.status) || (a.fireBy - b.fireBy));
   for (const r of ordered) {
     if (actions.length >= max) break;
-    // Rounds are permissionless; one nobody committed to holds nothing to fire or refund.
-    if (r.totalCommitted === 0n) continue;
     if (inFlight.has(`backoff:${r.address}`)) continue;
     let next: Action | null = null;
     if (r.status === 0) {
-      if (nowSec > r.fireBy) next = { kind: "abort", round: r.address };
+      // A round nobody joined has nothing to launch: close it at T0 so it stops showing as live.
+      if (nowSec > r.fireBy || (r.totalCommitted === 0n && nowSec >= r.closeAt)) next = { kind: "abort", round: r.address };
       else if (nowSec >= r.closeAt) next = { kind: "fire", round: r.address };
     } else if (r.status === 1) {
       if (r.distributeCursor < r.participantCount) {
