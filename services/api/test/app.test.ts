@@ -98,16 +98,17 @@ describe("drip", () => {
 
 describe("http api", () => {
   const store = new MemoryStore();
+  const attestDeps = {
+    info: async () => [],
+    chain: { isRound: async () => false, roundInfo: async () => ({ mode: 1, attestor: A, closeAt: 0 }), isContract: async () => false },
+    explorer: { firstFunding: async () => null, txCount: async () => 0 },
+    store,
+    attestor: privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"),
+    chainId: 99801,
+    now: () => NOW,
+  };
   const app = createApp({
-    attestDeps: {
-      info: async () => [],
-      chain: { isRound: async () => false, roundInfo: async () => ({ mode: 1, attestor: A, closeAt: 0 }), isContract: async () => false },
-      explorer: { firstFunding: async () => null, txCount: async () => 0 },
-      store,
-      attestor: privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"),
-      chainId: 99801,
-      now: () => NOW,
-    },
+    attestDeps,
     dripDeps: dripDeps(store),
     analysisPath: "does-not-exist.json",
   });
@@ -171,6 +172,21 @@ describe("http api", () => {
     const res = await app.request(`/epochs/claims/${A}`);
     expect(await res.json()).toEqual([{ epoch: 0, account: A.toLowerCase(), asset: A, amount: "5", proof: [] }]);
     expect((await app.request("/epochs/run", { method: "POST" })).status).toBe(401);
+  });
+
+  it("reports a posted epoch, whose basket amounts are bigints", async () => {
+    const withEpochs = createApp({
+      attestDeps,
+      dripDeps: dripDeps(store),
+      analysisPath: "does-not-exist.json",
+      epochs: {
+        adminToken: "secret",
+        run: async () => ({ id: 0, root: `0x${"11".repeat(32)}`, claims: 1, totals: [{ asset: A, amount: 281_687_389_026_006_114_889_080n }] }),
+      },
+    });
+    const res = await withEpochs.request("/epochs/run", { method: "POST", headers: { authorization: "Bearer secret" } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, epoch: { id: 0, totals: [{ asset: A, amount: "281687389026006114889080" }] } });
   });
 
   it("allows cross-origin reads", async () => {

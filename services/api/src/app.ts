@@ -88,7 +88,9 @@ export function createApp({ attestDeps, dripDeps, analysisPath, epochs }: AppDep
     if (!epochs || !epochs.adminToken || given.length !== expected.length || !timingSafeEqual(given, expected)) {
       return c.json({ ok: false, reason: "unauthorized" }, 401);
     }
-    return c.json({ ok: true, epoch: (await epochs.run()) ?? null });
+    const epoch = (await epochs.run()) ?? null;
+    const json = JSON.stringify({ ok: true, epoch }, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+    return c.body(json, 200, { "content-type": "application/json" });
   });
 
   app.get("/analysis", async (c) => {
