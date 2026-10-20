@@ -215,7 +215,8 @@ export default async function CertificatePage({ params }: Props) {
         <div className="ct-art">
           <WireArt birds={c.participants} labels={false} width={900} height={84} />
           <p className="cap">
-            {c.participants} {verified ? "Hyperliquid accounts" : "wallets"} on one wire, all at {price(avg)} a token.
+            {c.participants} {verified ? "Hyperliquid account" : "wallet"}
+            {c.participants === 1 ? "" : "s"} on one wire, all at {price(avg)} a token.
           </p>
         </div>
 

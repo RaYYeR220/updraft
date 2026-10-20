@@ -292,7 +292,8 @@ export function CertPreview({
             <div>
               <dt>Participants</dt>
               <dd>
-                {participants.length} {c.mode === 1 ? "Hyperliquid accounts" : "wallets"}
+                {participants.length} {c.mode === 1 ? "Hyperliquid account" : "wallet"}
+                {participants.length === 1 ? "" : "s"}
               </dd>
             </div>
             <div>

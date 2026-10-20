@@ -31,6 +31,18 @@ test("the stake page shows what everyone has staked without a wallet", async ({ 
   await expect(total).toHaveText(/\d.* DRAFT$/, { timeout: 30_000 });
 });
 
+// The demo film's round: its creator could not commit, and one wallet joined.
+test("a round whose creator can't commit says so, not that they can put in 0 USDC", async ({ page }) => {
+  await page.goto("/rounds/0xd90ADc4C7cA3Bbcf4628e5b467DF4e57aD326555");
+  await expect(page.locator("p.creator")).toContainText("The creator can't commit to this round.", { timeout: 30_000 });
+  await expect(page.locator("p.creator")).not.toContainText("at most 0 USDC");
+});
+
+test("a certificate with one wallet counts it in the singular", async ({ page }) => {
+  await page.goto("/certificate/0xb1a1c9db172ddb017976cebe8ceb7f7781df7ab4");
+  await expect(page.locator(".ct-art .cap")).toHaveText(/^1 wallet on one wire/, { timeout: 30_000 });
+});
+
 test("the sniper comparison is read from the chain", async ({ page }) => {
   await page.goto("/rounds/0x15f436B0D9A917179Fc5DD390072AD46Ed7aC03b");
   await expect(page.getByText(/5\.13× fewer tokens per USDC/)).toBeVisible({ timeout: 30_000 });

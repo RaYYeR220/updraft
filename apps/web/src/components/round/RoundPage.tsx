@@ -226,8 +226,16 @@ function Round({ address }: { address: Address }) {
             <a className="mono" href={explorerAddress(cfg.creator)} target="_blank" rel="noreferrer">
               {short(cfg.creator)}
             </a>
-            . The creator commits like everyone else, can put in at most {usdc(cfg.raise.creatorCap)} USDC, and vests in public:{" "}
-            {vesting(cfg.creatorVesting)}. Token address, {fired ? "as promised before launch" : "known before launch"}:{" "}
+            .{" "}
+            {cfg.raise.creatorCap === 0n ? (
+              "The creator can't commit to this round."
+            ) : (
+              <>
+                The creator commits like everyone else, can put in at most {usdc(cfg.raise.creatorCap)} USDC, and vests in public:{" "}
+                {vesting(cfg.creatorVesting)}.
+              </>
+            )}{" "}
+            Token address, {fired ? "as promised before launch" : "known before launch"}:{" "}
             <a className="mono" href={explorerAddress(s.expectedToken)} target="_blank" rel="noreferrer">
               {short(s.expectedToken)}
             </a>

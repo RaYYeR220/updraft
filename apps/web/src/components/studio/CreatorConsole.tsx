@@ -321,7 +321,7 @@ export function CreatorConsole({ id }: { id: string }) {
           .{" "}
           {s.fired ? (
             <>
-              At T0, {qa(s.fired.quoteUsed)} bought {ta(s.fired.tokensOut)} in one transaction, for {s.participantCount} wallets at one price. Ascend’s creator role now
+              At T0, {qa(s.fired.quoteUsed)} bought {ta(s.fired.tokensOut)} in one transaction, for {s.participantCount} wallet{s.participantCount === 1 ? "" : "s"} at one price. Ascend’s creator role now
               sits in vault{" "}
               <a className="mono" href={explorerAddress(s.fired.vault)} target="_blank" rel="noreferrer">
                 {short(s.fired.vault)}

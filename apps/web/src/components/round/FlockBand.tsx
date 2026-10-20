@@ -303,7 +303,7 @@ export function FlockBand({ birds, landed, caption }: { birds: FlockBird[]; land
   }, [landed]);
 
   const label = landed
-    ? `The committers, landed: ${birds.length} wallets on one wire.`
+    ? `The committers, landed: ${birds.length} wallet${birds.length === 1 ? "" : "s"} on one wire.`
     : `The flock: one bird per committer, ${birds.length} in all. Hover a bird to read its commit.`;
 
   return (
