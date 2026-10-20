@@ -79,7 +79,11 @@ export function CommitPanel({
   setText: (t: string) => void;
   voucher: Voucher | null;
   tx: TxState | null;
-  run: (label: string, send: () => Promise<`0x${string}`>, opts: { ctx?: ErrorContext; done: string | (() => Promise<string>) }) => Promise<boolean>;
+  run: (
+    label: string,
+    send: () => Promise<`0x${string}`>,
+    opts: { ctx?: ErrorContext; done: string | (() => Promise<string>); onConfirmed?: () => void },
+  ) => Promise<boolean>;
   ctx: ErrorContext;
 }) {
   const { address: wallet, updraft, connectInjected, startDemo } = useWallet();
@@ -114,20 +118,22 @@ export function CommitPanel({
   const submit = async () => {
     if (!amount || problem) return;
     const label = mode === "commit" ? `Commit ${usdc(amount)} USDC` : `Withdraw ${usdc(amount)} USDC`;
-    const ok =
-      mode === "commit"
-        ? await run(label, () => updraft.commit(state.address, amount, voucher ?? undefined), {
-            ctx,
-            done: `Committed ${usdc(amount)} USDC.${canWithdraw ? ` You can withdraw until the lock, ${when(cfg.windows.lockAt)}.` : ""}`,
-          })
-        : await run(label, () => updraft.withdraw(state.address, amount), {
-            ctx,
-            done:
-              paidOut(amount) === amount
-                ? `Withdrew ${usdc(amount)} USDC. It's back in your wallet.`
-                : `Withdrew ${usdc(amount)} USDC of your commit and received ${usdc(paidOut(amount))}: the escrow holds less than was committed, so every withdrawal takes the same cut.`,
-          });
-    if (ok) setText("");
+    // Cleared with the confirmation: left in until the position refetches, the preview would count it twice.
+    const onConfirmed = () => setText("");
+    await (mode === "commit"
+      ? run(label, () => updraft.commit(state.address, amount, voucher ?? undefined), {
+          ctx,
+          onConfirmed,
+          done: `Committed ${usdc(amount)} USDC.${canWithdraw ? ` You can withdraw until the lock, ${when(cfg.windows.lockAt)}.` : ""}`,
+        })
+      : run(label, () => updraft.withdraw(state.address, amount), {
+          ctx,
+          onConfirmed,
+          done:
+            paidOut(amount) === amount
+              ? `Withdrew ${usdc(amount)} USDC. It's back in your wallet.`
+              : `Withdrew ${usdc(amount)} USDC of your commit and received ${usdc(paidOut(amount))}: the escrow holds less than was committed, so every withdrawal takes the same cut.`,
+        }));
   };
 
   let cta: string;

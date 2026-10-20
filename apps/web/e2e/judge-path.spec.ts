@@ -68,6 +68,9 @@ test("a visitor with no wallet launches a round, another commits, both land at o
     .toBeGreaterThan(0n);
   await participant.locator("#amt").fill("250");
   await participant.getByRole("button", { name: "Commit 250 USDC" }).click();
+  // Once the commit is confirmed the amount is spent: the preview must not count it a second time.
+  await expect(participant.getByText(/^Committed 250 USDC\./)).toBeVisible({ timeout: 120_000 });
+  expect(await participant.locator("#amt").inputValue()).toBe("");
   await expect
     .poll(() => read({ address: round, abi: updraftRoundAbi, functionName: "commitOf", args: [wallet] }), {
       timeout: 120_000,

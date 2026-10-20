@@ -362,7 +362,11 @@ export function useTx() {
   const qc = useQueryClient();
   const [tx, setTx] = useState<TxState | null>(null);
   const run = useCallback(
-    async (label: string, send: () => Promise<Hash>, opts: { ctx?: ErrorContext; done: string | (() => Promise<string>) }) => {
+    async (
+      label: string,
+      send: () => Promise<Hash>,
+      opts: { ctx?: ErrorContext; done: string | (() => Promise<string>); onConfirmed?: () => void },
+    ) => {
       setTx({ label, phase: "signing" });
       try {
         const hash = await send();
@@ -373,6 +377,8 @@ export function useTx() {
           return false;
         }
         const message = typeof opts.done === "string" ? opts.done : await opts.done().catch(() => "Confirmed.");
+        // In the same render as the message, before the refetch below lands.
+        opts.onConfirmed?.();
         setTx({ label, phase: "done", hash, message });
         await qc.invalidateQueries();
         return true;
