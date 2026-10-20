@@ -69,6 +69,54 @@ The batch's tokens-per-USDC figure is after the 1% fee parity and the 0.5% platf
 
 Ascend's launch fee decays from 90% to 1% over five seconds. On an earlier deployment, a sniper that landed two seconds after fire paid 54.4% and still got 2.26× fewer tokens per USDC than the batch. A sniper later still pays less fee, but it still pays the marginal price above the batch's average. A buy in the same block as fire pays the full 90%; the fork test `test_fork_sniperAfterFire_paysTaxAndHigherPrice` pins that case.
 
+## $DRAFT: Updraft's own launch and the first staking epoch
+
+Round [0xA708…6bD4](https://elysium.kinetiq.xyz/testnet-explorer/address/0xA7082EaeF5e6ED1857f1545D0A5cbC7a204B6bD4). Token $DRAFT, [0xcBA4…15B3](https://elysium.kinetiq.xyz/testnet-explorer/address/0xcBA4b9c291999b46BF516231E2d6C7Ab509415B3). Vault [0xffcb…ea52](https://elysium.kinetiq.xyz/testnet-explorer/address/0xffcb54ad968b42489ecf62fd4a6bf618648aea52).
+
+The round was public from Oct 18 to Oct 20, 12:00 UTC. No outside wallet committed. The only commit is the creator's 500 USDC, and that share vests: a 30-day cliff, then 180 days. Our keeper fired the round 6 s after close:
+
+- 495 USDC went in as Ascend's launch buy.
+- 5 USDC went to Ascend's own bid.
+- The buy returned 56,337,478 $DRAFT.
+- 0.5%, 281,687 $DRAFT, went to the staking basket.
+
+| Step | Transaction |
+|---|---|
+| Create the round | [0x0bf0fb12…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0x0bf0fb12999d6b836d6c6309ae4b11ea9c1ce409939ca55e03851adf92ec867f) |
+| Creator commits 500 USDC | [0x1db8d2c5…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0x1db8d2c5f7aab7a71c4f083d6330dda03ef8b60fc04137f8b02b9a5bde9a616d) |
+| **Fire**: Ascend launch, fee parity, vault handoff, certificate | [0x58f16880…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0x58f168806cb5834f6c4d57b9159083c4592fe4c9a75c915f9f93d457294af8ea) |
+
+**Staking.** The steps below were all sent from the team's test wallet, [0xc6D9…8f02](https://elysium.kinetiq.xyz/testnet-explorer/address/0xc6D9588923181FBB84ACF028a85C442421828f02), so it is the only staker in this epoch.
+
+1. We bound $DRAFT to the staking contract [0x90A3…7E6f](https://elysium.kinetiq.xyz/testnet-explorer/address/0x90A39170D14C22711dC7dDbeF1367d58cbFA7E6f).
+2. 3 min 46 s after the fire, we bought 20 USDC of $DRAFT on Ascend's market. That buy paid Ascend's 1% fee and the price the batch had left behind: 101,073 $DRAFT per USDC, against the batch's 112,112.
+3. We staked all of it.
+4. The API's epoch job then closed epoch 0, a time-weighted Merkle tree over the whole basket. Its leaves can be recomputed from the contract's events.
+5. One `claimMany` paid every allocation in full.
+
+| Step | Transaction |
+|---|---|
+| Bind $DRAFT as the stake token | [0xfc93b0bc…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0xfc93b0bca5a7783e8dee9c0e2749fa683847447937305748fb19ba1647bae46a) |
+| Buy 20 USDC of $DRAFT on Ascend | [0x21c5202f…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0x21c5202f3559cd2e4e2783c0e91dfcc3589e9f4bfc6ceb478758e3c868a7b422) |
+| Stake it | [0xf8574a35…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0xf8574a352fb4b59a10de43793ea3d0ac561d3d2fdf46c1ce31ac6890ff5a732d) |
+| **Post epoch 0**: root, window, basket | [0x583aa95c…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0x583aa95ce11478dbf0223a3cdb7b6d1e380bc6a66b150257de0fc5f280367d7b) |
+| **Claim all eight assets** | [0xe1fafe90…](https://elysium.kinetiq.xyz/testnet-explorer/tx/0xe1fafe90e7d9c2107e6487d900ae2e5b121150ef954d2eeaba3cfe6a595c631a) |
+
+The basket epoch 0 paid out holds the platform's share of every round fired on this deployment, plus the creator fees the vaults harvested:
+
+| Asset | Paid |
+|---|---|
+| REH1 | 669,020 |
+| SNIPE | 867,926 |
+| VEST | 281,687 |
+| DRAFT | 281,687 |
+| EAEAO3 | 148,210 |
+| EJ9VLA | 148,210 |
+| FILM | 148,210 |
+| USDC | 3.61 |
+
+Most of it comes from rehearsal and test rounds. EAEAO3 and EJ9VLA were opened by our end-to-end tests, and FILM by the demo recording.
+
 ## Refusals
 
 These transactions show what the contracts refuse. Each one was mined on purpose, with a fixed gas limit, so it stays on the record. Blockscout decodes the reason.
@@ -105,7 +153,7 @@ Script: `services/keeper/scripts/refusals.ts`.
 | Suite | Count | Command |
 |---|---|---|
 | Contracts: unit, invariant, and fork against the live launchpad at a pinned block | 142 | `cd contracts && forge test` |
-| API: attestor, Hyperliquid rules, evidence, epochs, drip | 34 | `pnpm --filter @updraft/api test` |
+| API: attestor, Hyperliquid rules, evidence, epochs, drip | 35 | `pnpm --filter @updraft/api test` |
 | Keeper | 10 | `pnpm --filter @updraft/keeper test` |
 | MCP | 14 | `pnpm --filter @updraft/mcp test` |
 | Analysis | 4 | `pnpm --filter @updraft/analysis test` |

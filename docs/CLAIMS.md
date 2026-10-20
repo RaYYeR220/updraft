@@ -27,7 +27,7 @@ Every claim Updraft makes, and how far it is proven.
 | A round that can't launch aborts and refunds pro-rata | Live, Tested | [Refusals](PROOF.md#refusals): below-minimum abort and full refund; `test_fire_belowMinimum_aborts`, `test_fire_whenCurveChanged_aborts`, `test_I9_launchRevert_abortsWithRefunds`, `test_F10_postAbortBurn_isSharedProRata` |
 | Nobody can end a round by making its launch fail (starved gas, a held Infinity lock): a failed launch reverts `fire()` and the round stays live | Tested | `test_F17_*`, `test_fork_fireInsideAForeignLock_revertsAndTheRoundStaysLive` (live Ascend); [SECURITY.md](SECURITY.md#what-f16-and-f17-taught-us) |
 | Verified rounds cap one wallet per Hyperliquid account, with published rules and refusals that come with evidence | Tested | `RoundVerified.t.sol`; API attestor tests; rules at `GET /rules/v1` |
-| $DRAFT stakers earn the platform basket by epoch; principal can never be frozen | Tested | `UpdraftStaking.t.sol`; API `epochs` tests |
+| $DRAFT stakers earn the platform basket by epoch; principal can never be frozen | Live, Tested | [$DRAFT and epoch 0](PROOF.md#draft-updrafts-own-launch-and-the-first-staking-epoch): stake, epoch posted by the API job, eight assets claimed (one staker, our test wallet); `UpdraftStaking.t.sol`; API `epochs` tests |
 
 ## Data
 
