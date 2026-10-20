@@ -159,7 +159,7 @@ Script: `services/keeper/scripts/refusals.ts`.
 | Analysis | 4 | `pnpm --filter @updraft/analysis test` |
 | Widget | 4 | `pnpm --filter @updraft/widget test` |
 | SDK: permit domains, plus end to end on an anvil fork of Elysium with the real deploy script | 5 | `pnpm --filter @updraft/sdk test` |
-| Web, against the live app: every page on desktop and mobile, plus the full visitor path below | 19 | `pnpm --filter @updraft/web test:e2e` |
+| Web, against the live app: every page on desktop and mobile, plus the full visitor path below | 21 | `pnpm --filter @updraft/web test:e2e` |
 
 The visitor path (`apps/web/e2e/judge-path.spec.ts`) uses no wallet and no setup, and nothing is mocked. It runs against the deployed app and Elysium testnet in about three minutes:
 
