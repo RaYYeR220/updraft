@@ -3,7 +3,7 @@ import { PerchDefs } from "./Bird";
 import { PerchWire } from "./PerchWire";
 import "@/styles/landing.css";
 
-const GITHUB = "https://github.com/RaYYeR220/updraft";
+const CODE = "https://gitlab.com/RaYYeR220/updraft";
 const X = "https://x.com/";
 
 /** The footer under the landing and the analysis page. It also carries the perched-bird symbol their figures use. */
@@ -41,8 +41,8 @@ export function SiteFooter() {
               <Link href="/bottom-of-curve">Bottom of the curve</Link>
             </li>
             <li>
-              <a href={GITHUB} target="_blank" rel="noreferrer">
-                GitHub
+              <a href={CODE} target="_blank" rel="noreferrer">
+                GitLab
               </a>
             </li>
           </ul>

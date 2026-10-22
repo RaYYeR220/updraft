@@ -107,4 +107,4 @@ These also came from the pre-publication review.
 
 ## Reporting
 
-Please open a GitHub issue marked `security`, or contact the maintainer listed on the GitHub profile.
+Please open a GitLab issue marked `security` at https://gitlab.com/RaYYeR220/updraft/-/issues, or contact the maintainer listed on the GitLab profile.

@@ -31,6 +31,11 @@ test("the stake page shows what everyone has staked without a wallet", async ({ 
   await expect(total).toHaveText(/\d.* DRAFT$/, { timeout: 30_000 });
 });
 
+test("the footer links to the code on GitLab", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("footer").getByRole("link", { name: "GitLab" })).toHaveAttribute("href", "https://gitlab.com/RaYYeR220/updraft");
+});
+
 // The demo film's round: its creator could not commit, and one wallet joined.
 test("a round whose creator can't commit says so, not that they can put in 0 USDC", async ({ page }) => {
   await page.goto("/rounds/0xd90ADc4C7cA3Bbcf4628e5b467DF4e57aD326555");
