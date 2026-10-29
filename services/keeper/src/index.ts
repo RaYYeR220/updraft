@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { type Address, type Hex, createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { type Deployment, Status, createUpdraftClient, elysiumTestnet } from "@updraft/sdk";
-import { type Action, type RoundView, actionKey, plan } from "./plan.js";
+import { type Action, type RoundView, actionKey, plan, planOptions } from "./plan.js";
 
 const RPC = process.env.ELYSIUM_RPC ?? "https://testnet-rpc.elysium.kinetiq.xyz";
 const key = process.env.KEEPER_PRIVATE_KEY as Hex | undefined;
@@ -12,6 +12,7 @@ const deploymentPath = process.env.DEPLOYMENT_FILE ?? new URL("../../../deployme
 const deployment = JSON.parse(readFileSync(deploymentPath, "utf8")) as Deployment;
 const INTERVAL_MS = Number(process.env.KEEPER_INTERVAL_MS ?? 15_000);
 const MAX_TX_PER_HOUR = Number(process.env.KEEPER_MAX_TX_PER_HOUR ?? 120);
+const PLAN_OPTIONS = planOptions(process.env);
 const sentAt: number[] = [];
 
 const chain = { ...elysiumTestnet, rpcUrls: { default: { http: [RPC] } } };
@@ -89,7 +90,7 @@ async function tick() {
     const now = Number((await publicClient.getBlock()).timestamp);
     const blocked = new Set(inFlight);
     for (const [round, f] of failures) if (f.until > Date.now()) blocked.add(`backoff:${round}`);
-    for (const action of plan(views, now, blocked)) {
+    for (const action of plan(views, now, blocked, PLAN_OPTIONS)) {
       // A gas budget: rounds are permissionless, so the keeper never spends without limit.
       while (sentAt.length && sentAt[0] < Date.now() - 3_600_000) sentAt.shift();
       if (sentAt.length >= MAX_TX_PER_HOUR) {

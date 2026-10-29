@@ -22,6 +22,18 @@ export type Action =
 
 export const actionKey = (a: Action) => `${a.kind}:${a.round}`;
 
+export interface PlanOptions {
+  chunk: number;
+  harvestEverySec: number;
+  maxActions?: number;
+}
+
+/** The planner's settings for a deployment: KEEPER_HARVEST_EVERY_SEC spaces out fee harvests. */
+export const planOptions = (env: Record<string, string | undefined>): PlanOptions => ({
+  chunk: 100,
+  harvestEverySec: Number(env.KEEPER_HARVEST_EVERY_SEC ?? 1800),
+});
+
 /**
  * What to do next for each round. Everything here is permissionless on-chain; the keeper only
  * makes sure it happens on time. At most one action per round per pass.
@@ -30,7 +42,7 @@ export function plan(
   rounds: RoundView[],
   nowSec: number,
   inFlight: Set<string>,
-  opts: { chunk: number; harvestEverySec: number; maxActions?: number } = { chunk: 100, harvestEverySec: 1800 },
+  opts: PlanOptions = planOptions({}),
 ): Action[] {
   const actions: Action[] = [];
   const max = opts.maxActions ?? 10;

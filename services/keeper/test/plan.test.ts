@@ -1,6 +1,6 @@
 import type { Address } from "viem";
 import { describe, expect, it } from "vitest";
-import { type RoundView, plan } from "../src/plan.js";
+import { type RoundView, plan, planOptions } from "../src/plan.js";
 
 const R = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as Address;
 const base: RoundView = {
@@ -37,6 +37,15 @@ describe("keeper plan", () => {
     const fired = { ...base, status: 1 as const, participantCount: 3, distributeCursor: 3, vault: R(9), lastHarvestAt: 1000 };
     expect(plan([fired], 2799, new Set())).toEqual([]);
     expect(plan([fired], 2800, new Set())).toEqual([{ kind: "harvest", round: R(1), vault: R(9) }]);
+  });
+
+  it("takes the harvest interval from the environment, half an hour by default", () => {
+    // Harvests on a quiet testnet only spend gas, so a deployment can space them out.
+    expect(planOptions({})).toEqual({ chunk: 100, harvestEverySec: 1800 });
+    const daily = planOptions({ KEEPER_HARVEST_EVERY_SEC: "86400" });
+    const fired = { ...base, status: 1 as const, participantCount: 3, distributeCursor: 3, vault: R(9), lastHarvestAt: 1000 };
+    expect(plan([fired], 87_399, new Set(), daily)).toEqual([]);
+    expect(plan([fired], 87_400, new Set(), daily)).toEqual([{ kind: "harvest", round: R(1), vault: R(9) }]);
   });
 
   it("never plans an action that is already in flight", () => {
